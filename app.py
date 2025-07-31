@@ -1124,7 +1124,7 @@ def export_pdf():
 
 # Set webhook เฉพาะตอนอยู่บน Render
 if os.environ.get("RENDER") == "true":
-    webhook_url = "https://wice-transports-1.onrender.com/callback"
+    webhook_url = "https://wice-transports-1.onrender.com"
     set_line_webhook(webhook_url)
 
 # 🧪 ถ้าเป็น local ให้รัน app และ set webhook แบบ localhost
