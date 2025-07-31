@@ -1121,7 +1121,7 @@ def export_pdf():
 #     app.run(debug=True, port=PORT)
 if __name__ == '__main__':
     # กำหนด URL ของแอปบน Render เอง (เปลี่ยนให้ตรงกับ URL จริงของคุณ)
-    webhook_url = "https://your-app-name.onrender.com"  # <-- แก้ตรงนี้
+    webhook_url = "https://wice-transports.onrender.com"  # <-- แก้ตรงนี้
 
     set_line_webhook(webhook_url)
 
