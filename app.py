@@ -1119,14 +1119,14 @@ def export_pdf():
 #     if public_url:
 #         set_line_webhook(public_url)
 #     app.run(debug=True, port=PORT)
-if __name__ == '__main__':
-    # กำหนด URL ของแอปบน Render เอง (เปลี่ยนให้ตรงกับ URL จริงของคุณ)
-    webhook_url = "https://wice-transports.onrender.com"  # <-- แก้ตรงนี้
 
+if os.environ.get("RENDER") == "true":
+    webhook_url = "https://wice-transports.onrender.com"
     set_line_webhook(webhook_url)
 
-    # กำหนดพอร์ตจาก environment variable (Render กำหนดให้)
-    PORT = int(os.environ.get('PORT', 5000))
+if __name__ == '__main__':
+    webhook_url = "http://localhost:5000"
+    set_line_webhook(webhook_url)
 
-    # รัน Flask บน host 0.0.0.0 (เพื่อให้ Render เข้าถึงได้)
+    PORT = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=PORT)
