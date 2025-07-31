@@ -471,7 +471,8 @@ def form():
 
         cursor.execute("SELECT * FROM Transports WHERE TRIM(LOWER(FormType)) = %s AND RecordDate = %s", ('domestic', today))
         domestic_data = cursor.fetchall()
-        cursor.execute("""SELECT ID, Plate, Name, Sender, Customer, QueueTime, StartDeliver, DoneDeliver, TruckLoadIn, StartLoad, DoneLoad, PI, EO, Containernumber, Producttype, Remark FROM Transports WHERE TRIM(LOWER(FormType)) = %s AND RecordDate = %s""", ('export', today))
+        # cursor.execute("""SELECT ID, Plate, Name, Sender, Customer, QueueTime, StartDeliver, DoneDeliver, TruckLoadIn, StartLoad, DoneLoad, PI, EO, Containernumber, Producttype, Remark FROM Transports WHERE TRIM(LOWER(FormType)) = %s AND RecordDate = %s""", ('export', today))
+        cursor.execute("""SELECT ID, Plate, Name, Sender, Customer, QueueTime, StartDeliver, DoneDeliver, TruckLoadIn, StartLoad, DoneLoad, PI, EO, Containernumber AS containernumber, Producttype AS producttype, Remark FROM Transports WHERE TRIM(LOWER(FormType)) = %s AND RecordDate = %s """, ('export', today))
         export_data = cursor.fetchall()
 
         cursor.close()
@@ -544,6 +545,7 @@ def search_data():
 
 @app.route('/submit', methods=['POST'])
 def submit():
+    print(request.form)  # debug form field ที่รับมา
     plate = request.form.get('plate', '')
     name = request.form.get('name', '')
     sender = request.form.get('sender', '')
@@ -559,10 +561,10 @@ def submit():
     Status = request.form.get('Status', '')
     Deliverytime_tocustomer = request.form.get('Deliverytimetocustomer', '')
     Delivery_Date = request.form.get('DeliveryDate', '')
-    Pi = request.form.get('PI', '')
-    Eo = request.form.get('EO', '')
-    Container_number = request.form.get('Containernumber', '')
-    Product_type = request.form.get('Producttype', '')
+    Pi = request.form.get('Pi', '')  # ✅ แก้จาก 'PI' → 'Pi'
+    Eo = request.form.get('Eo', '')  # ✅ แก้จาก 'EO' → 'Eo'
+    Container_number = request.form.get('Container_number', '')  # ✅
+    Product_type = request.form.get('Product_type', '')  # ✅
     form_type = request.form.get('formType', '')
     RecordDate = request.form.get('date', '')
 
@@ -653,9 +655,7 @@ def update():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # ตรวจสอบว่า 'confirmregis' (หรือ 'regReceive' ที่เป็นชื่อในฟอร์ม) มีอยู่ในข้อมูลหรือไม่
-        # เพื่อแยก Domestic และ Export
-        if 'regReceive' in data: # Domestic update
+        if 'confirmregis' in data:
             cursor.execute("""
                 UPDATE Transports SET
                     Plate=%s, Name=%s, Sender=%s, Customer=%s, QueueTime=%s,
@@ -664,7 +664,7 @@ def update():
                 WHERE ID=%s
             """, (
                 data['plate'], data['name'], data['sender'], data['customer'], data['arrivalTime'],
-                data['startUnload'], data['endUnload'], data['regReceive'], data['truckUnload'],
+                data['startUnload'], data['endUnload'], data['confirmregis'], data['truckUnload'],
                 data['startLoad'], data['endLoad'], data['Deliverytime'], data['Status'], data['Deliverytimetocustomer'], data['DeliveryDate'], data['remark'],
                 data['id']
             ))

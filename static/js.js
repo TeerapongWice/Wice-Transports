@@ -138,43 +138,66 @@ function toggleEditSave(btn) {
     let data = { id };
 
     if (formType === 'Domestic') {
-      data = {
-        id,
-        plate: inputs[0].value,
-        name: inputs[1].value,
-        sender: inputs[2].value,
-        customer: inputs[3].value,
-        arrivalTime: inputs[4].value,
-        startUnload: inputs[5].value,
-        endUnload: inputs[6].value,
-        regReceive: inputs[7].value,
-        truckUnload: inputs[8].value,
-        startLoad: inputs[9].value,
-        endLoad: inputs[10].value,
-        Deliverytime: inputs[11].value,
-        Status: inputs[12].value,
-        Deliverytimetocustomer: inputs[13].value,
-        DeliveryDate: inputs[14].value,
-        remark: inputs[15].value,
-      };
+      // data = {
+      //   id,
+      //   plate: inputs[0].value,
+      //   name: inputs[1].value,
+      //   sender: inputs[2].value,
+      //   customer: inputs[3].value,
+      //   arrivalTime: inputs[4].value,
+      //   startUnload: inputs[5].value,
+      //   endUnload: inputs[6].value,
+      //   regReceive: inputs[7].value,
+      //   truckUnload: inputs[8].value,
+      //   startLoad: inputs[9].value,
+      //   endLoad: inputs[10].value,
+      //   Deliverytime: inputs[11].value,
+      //   Status: inputs[12].value,
+      //   Deliverytimetocustomer: inputs[13].value,
+      //   DeliveryDate: inputs[14].value,
+      //   remark: inputs[15].value,
+      // };
+
+      // เปลี่ยนจาก regReceive เป็น confirmregis
+    data = {
+      id,
+      plate: inputs[0].value,
+      name: inputs[1].value,
+      sender: inputs[2].value,
+      customer: inputs[3].value,
+      arrivalTime: inputs[4].value,
+      startUnload: inputs[5].value,
+      endUnload: inputs[6].value,
+      confirmregis: inputs[7].value,  // <-- แก้ตรงนี้
+      truckUnload: inputs[8].value,
+      startLoad: inputs[9].value,
+      endLoad: inputs[10].value,
+      Deliverytime: inputs[11].value,
+      Status: inputs[12].value,
+      Deliverytimetocustomer: inputs[13].value,
+      DeliveryDate: inputs[14].value,
+      remark: inputs[15].value,
+    };
+
     } else if (formType === 'Export') {
       data = {
         id,
-        plate: inputs[0].value,
-        name: inputs[1].value,
-        sender: inputs[2].value,
-        customer: inputs[3].value,
-        arrivalTime: inputs[4].value,
-        startUnload: inputs[5].value,
-        endUnload: inputs[6].value,
-        truckUnload: inputs[7].value,
-        startLoad: inputs[8].value,
-        endLoad: inputs[9].value,
-        Pi: inputs[10].value,
-        Eo: inputs[11].value,
-        Container_number: inputs[12].value,
-        Product_type: inputs[13].value,
+        plate: inputs[3].value,
+        name: inputs[4].value,
+        sender: inputs[5].value,
+        customer: inputs[6].value,
+        arrivalTime: inputs[8].value,
+        startUnload: inputs[9].value,
+        endUnload: inputs[10].value,
+        truckUnload: inputs[11].value,
+        startLoad: inputs[12].value,
+        endLoad: inputs[13].value,
+        Pi: inputs[0].value,
+        Eo: inputs[1].value,
+        Container_number: inputs[2].value,
+        Product_type: inputs[7].value,
         remark: inputs[14].value,
+        formtype: formType,
       };
     }
 
@@ -196,7 +219,6 @@ function toggleEditSave(btn) {
   }
 }
 
-
 function deleteRow(btn) {
   const row = btn.closest("tr");
   const id = row.dataset.id;
@@ -216,6 +238,83 @@ function deleteRow(btn) {
     });
   }
 }
+
+// function toggleEditSave(btn) {
+//   const row = btn.closest("tr");
+//   const inputs = row.querySelectorAll("input[type='text']");
+//   const formType = row.dataset.formtype;
+
+//   if (btn.textContent === "Edit") {
+//     // เปลี่ยน input ให้แก้ไขได้
+//     inputs.forEach(input => input.disabled = false);
+//     btn.textContent = "Save";
+//     btn.classList.remove('btn-edit');
+//     btn.classList.add('btn-save');
+//   } else {
+//     // กด Save จะเก็บข้อมูลจาก input ตามลำดับจริง
+//     const id = row.dataset.id;
+//     let data = { id };
+
+//     if (formType === 'Domestic') {
+//       data = {
+//         id,
+//         plate: inputs[0].value,               // 1. ทะเบียน
+//         name: inputs[1].value,                // 2. ชื่อ
+//         sender: inputs[2].value,              // 3. ผู้ขนส่ง
+//         customer: inputs[3].value,            // 4. ลูกค้า
+//         arrivalTime: inputs[4].value,         // 5. เวลาที่รถลงคิว (QueueTime)
+//         startUnload: inputs[5].value,         // 6. เริ่มตั้งสินค้า (StartDeliver)
+//         endUnload: inputs[6].value,           // 7. ตั้งสินค้าสำเร็จ (DoneDeliver)
+//         regReceive: inputs[7].value,          // 8. ขนส่งตอบรับทะเบียน (ConfirmRegis)
+//         truckUnload: inputs[8].value,         // 9. รถเข้าโหลดสินค้า (TruckLoadIn)
+//         startLoad: inputs[9].value,           // 10. เริ่มโหลดสินค้า (StartLoad)
+//         endLoad: inputs[10].value,            // 11. โหลดสินค้าสำเร็จ (DoneLoad)
+//         Deliverytime: inputs[11].value,       // 12. เวลาส่งสินค้า (Deliverytime)
+//         Status: inputs[12].value,             // 13. Status
+//         Deliverytimetocustomer: inputs[13].value,  // 14. เวลาส่งถึงลูกค้า
+//         DeliveryDate: inputs[14].value,       // 15. Delivery Date
+//         remark: inputs[15].value               // 16. หมายเหตุ
+//       };
+//     } else if (formType === 'Export') {
+//       data = {
+//         id,
+//         plate: inputs[3].value,
+//         name: inputs[4].value,
+//         sender: inputs[5].value,
+//         customer: inputs[6].value,
+//         arrivalTime: inputs[8].value,
+//         startUnload: inputs[9].value,
+//         endUnload: inputs[10].value,
+//         truckUnload: inputs[11].value,
+//         startLoad: inputs[12].value,
+//         endLoad: inputs[13].value,
+//         Pi: inputs[0].value,
+//         Eo: inputs[1].value,
+//         Container_number: inputs[2].value,
+//         Product_type: inputs[7].value,
+//         remark: inputs[14].value,
+//         formtype: formType,
+//       };
+//     }
+
+//     // ส่งข้อมูลไปยัง backend
+//     fetch('/update', {
+//       method: 'POST',
+//       headers: { 'Content-Type': 'application/json' },
+//       body: JSON.stringify(data)
+//     }).then(response => {
+//       if (response.ok) {
+//         alert("อัปเดตสำเร็จ");
+//         inputs.forEach(input => input.disabled = true);
+//         btn.textContent = "Edit";
+//         btn.classList.remove('btn-save');
+//         btn.classList.add('btn-edit');
+//       } else {
+//         alert("เกิดข้อผิดพลาด");
+//       }
+//     });
+//   }
+// }
 
 let selectedRowIds = [];
 let currentFormType = '';
