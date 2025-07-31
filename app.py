@@ -1119,14 +1119,14 @@ def export_pdf():
 #     if public_url:
 #         set_line_webhook(public_url)
 #     app.run(debug=True, port=PORT)
-
+# 🌐 ตั้ง Webhook ถ้าเป็น Render
 if os.environ.get("RENDER") == "true":
     webhook_url = "https://wice-transports.onrender.com"
     set_line_webhook(webhook_url)
 
+# 🧪 ถ้าเป็น local ให้รัน app และ set webhook local
 if __name__ == '__main__':
     webhook_url = "http://localhost:5000"
     set_line_webhook(webhook_url)
 
-    PORT = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=PORT)
