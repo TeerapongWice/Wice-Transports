@@ -1,0 +1,48 @@
+# Environment variables
+.env
+
+# Executable & build files
+*.exe
+*.spec
+dist/
+build/
+
+# Ignore "New folder"
+New\ folder/
+
+# Access database
+*.accdb
+
+# Log and temporary files
+*.log
+*.tmp
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# macOS system
+.DS_Store
+
+# VS Code settings
+.vscode/
+
+# Ignore specific python scripts
+check_data.py
+create_db.py
+create_table.py
+create_transports_table.py
+create_user.py
+wice.py
+
+# Ignore batch file
+start.bat
+
+# Ignore text file
+user_ids.txt
+
+# Ignore sqlite database file
+wice_transport.sqlite
+File_Excel_Templates/
+render.yaml
+requirements.txt

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='/Img/LogoTransport-removebg-preview.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fontawesome/css/all.min.css') }}">
+  <title>WICE Transport Form</title>
+</head>
+
+<body>
+  <header>
+    <div class="logo">
+      <!-- ถ้าไม่มีโลโก้ลบ img ออกได้ -->
+      <img src="{{ url_for('static', filename='Img/LogoTransport.png') }}" alt="WICE Transport Logo" />
+    </div>
+    <label for="wice">WICE Transports</label>
+    <div class="userlog">
+      <div class="user-info" onclick="toggleDropdown()">
+        <img src="{{ url_for('static', filename='Img/user.png') }}" alt="User" />
+        <span>{{ username }}</span>
+        <i class="arrow-down">▼</i>
+      </div>
+      <div class="dropdown" id="userDropdown">
+        <a href="/logout">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="form-container">
+    <div class="form-tabs">
+      <h2 class="form-title active" onclick="toggleForm('domestic')">Domestic</h2>
+      <h2 class="form-title" onclick="toggleForm('export')">Export</h2>
+    </div>
+
+    <!-- Domestic Form -->
+    <section class="form-section active" id="domesticForm">
+      <div class="formimport">
+        <h3>Import Domestic</h3>
+        <input type="file" id="excelDomestic" />
+        <button onclick="importExcel('Domestic')">Import Domestic</button>
+      </div>
+      <form id="transportForm">
+        <input type="hidden" name="formType" value="Domestic" />
+        <div class="form-grid">
+          <input type="hidden" id="date" name="date" value="{{ current_date }}">
+          <div class="form-item"><label for="plate">ทะเบียน</label><input type="text" id="plate" name="plate" /></div>
+          <div class="form-item"><label for="name">ชื่อ-สกุล</label><input type="text" id="name" name="name" /></div>
+          <div class="form-item">
+            <label for="senderInput">ผู้ขนส่ง</label>
+            <div class="custom-select-container" data-type="Domestic">
+              <div class="custom-select-header"
+                onclick="toggleSenderDropdown(this.closest('.custom-select-container'))">
+                เลือกผู้ขนส่ง <span class="arrow">▼</span>
+              </div>
+              <div class="custom-select-body">
+                <div class="top-bar">
+                  <input type="text" class="search-input" placeholder="ค้นหา..."
+                    oninput="filterOptions(this.closest('.custom-select-container'))" />
+                  <button class="add-btn" onclick="showAddInput(this.closest('.custom-select-container'))"
+                    type="button">+</button>
+                </div>
+                <div class="add-section" style="display:none;">
+                  <input type="text" class="new-item-input" placeholder="ชื่อผู้ขนส่งใหม่..." />
+                  <button class="confirm-btn" onclick="addMasterTransport(this)" type="button">ยืนยัน</button>
+                </div>
+                <div class="sender-option-list"></div>
+              </div>
+            </div>
+            <input type="hidden" name="sender" />
+          </div>
+
+          <!-- ลูกค้า (Customer) ก็ปรับแบบเดียวกัน -->
+          <div class="form-item">
+            <label for="customerInput">ลูกค้า</label>
+            <div class="custom-select-container" data-type="Domestic">
+              <div class="custom-select-header"
+                onclick="toggleCustomerDropdown(this.closest('.custom-select-container'))">
+                เลือกลูกค้า <span class="arrow">▼</span>
+              </div>
+              <div class="custom-select-body">
+                <div class="top-bar">
+                  <input type="text" class="search-input" placeholder="ค้นหา..."
+                    oninput="filterCustomerOptions(this.closest('.custom-select-container'))" />
+                  <button class="add-btn" onclick="showAddCustomerInput(this.closest('.custom-select-container'))"
+                    type="button">+</button>
+                </div>
+                <div class="add-section" style="display:none;">
+                  <input type="text" class="new-item-input" placeholder="ชื่อลูกค้าใหม่..." />
+                  <button class="confirm-btn" onclick="addMasterCustomer(this)" type="button">ยืนยัน</button>
+                </div>
+                <div class="customer-option-list"></div>
+              </div>
+            </div>
+            <input type="hidden" name="customer" />
+          </div>
+          <div class="form-item"><label for="arrivalTime">เวลาที่รถลงคิว</label><input type="text" id="arrivalTime"
+              name="arrivalTime" /></div>
+          <div class="form-item"><label for="startUnload">เริ่มตั้งสินค้า</label><input type="text" id="startUnload"
+              name="startUnload" /></div>
+          <div class="form-item"><label for="endUnload">ตั้งสินค้าสำเร็จ</label><input type="text" id="endUnload"
+              name="endUnload" /></div>
+          <div class="form-item"><label for="regReceive">ขนส่งตอบรับทะเบียน</label><input type="text" id="regReceive"
+              name="regReceive" /></div>
+          <div class="form-item"><label for="truckUnload">รถเข้าโหลดสินค้า</label><input type="text" id="truckUnload"
+              name="truckUnload" /></div>
+          <div class="form-item"><label for="startLoad">เริ่มโหลดสินค้า</label><input type="text" id="startLoad"
+              name="startLoad" /></div>
+          <div class="form-item"><label for="endLoad">โหลดสินค้าสำเร็จ</label><input type="text" id="endLoad"
+              name="endLoad" /></div>
+          <div class="form-item"><label for="Deliverytime">เวลาส่งสินค้า</label><input type="text" id="Deliverytime"
+              name="Deliverytime" /></div>
+          <div class="form-item"><label for="Status">Status</label><input type="text" id="Status" name="Status" /></div>
+          <div class="form-item"><label for="Deliverytimetocustomer">วลาส่งถึงลูกค้า</label><input type="text"
+              id="Deliverytimetocustomer" name="Deliverytimetocustomer" /></div>
+          <div class="form-item"><label for="DeliveryDate">Delivery Date</label><input type="text" id="DeliveryDate"
+              name="DeliveryDate" /></div>
+          <div class="form-item"><label>&nbsp;</label><button type="submit" class="submit-btn">บันทึก</button></div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Export Form -->
+    <section class="form-section" id="exportForm">
+      <div class="formimport">
+        <h3>Import Export</h3>
+        <input type="file" id="excelExport" />
+        <button onclick="importExcel('Export')">Import Export</button>
+      </div>
+      <form id="exportFormData">
+        <input type="hidden" name="formType" value="Export" />
+        <div class="form-grid">
+          <input type="hidden" id="date" name="date" value="{{ current_date }}">
+          <div class="form-item"><label for="Pi">PI</label><input type="text" id="Pi" name="Pi" /></div>
+          <div class="form-item"><label for="Eo">EO</label><input type="text" id="Eo" name="Eo" /></div>
+          <div class="form-item"><label for="Container_number">เบอร์ตู้</label><input type="text" id="Container_number"
+              name="Container_number" /></div>
+          <div class="form-item"><label for="plate_export">ทะเบียน</label><input type="text" id="plate_export"
+              name="plate" /></div>
+          <div class="form-item"><label for="name_export">ชื่อ-สกุล</label><input type="text" id="name_export"
+              name="name" /></div>
+          <div class="form-item">
+            <label for="senderInput">ผู้ขนส่ง</label>
+            <div class="custom-select-container" data-type="Export">
+              <div class="custom-select-header"
+                onclick="toggleSenderDropdown(this.closest('.custom-select-container'))">
+                เลือกผู้ขนส่ง <span class="arrow">▼</span>
+              </div>
+              <div class="custom-select-body">
+                <div class="top-bar">
+                  <input type="text" class="search-input" placeholder="ค้นหา..."
+                    oninput="filterOptions(this.closest('.custom-select-container'))" />
+                  <button class="add-btn" onclick="showAddInput(this.closest('.custom-select-container'))"
+                    type="button">+</button>
+                </div>
+                <div class="add-section" style="display:none;">
+                  <input type="text" class="new-item-input" placeholder="ชื่อผู้ขนส่งใหม่..." />
+                  <button class="confirm-btn" onclick="addMasterTransport(this)" type="button">ยืนยัน</button>
+                </div>
+                <div class="sender-option-list"></div>
+              </div>
+            </div>
+            <input type="hidden" name="sender" />
+          </div>
+
+          <div class="form-item">
+            <label for="customerInput">ประเทศ</label>
+            <div class="custom-select-container" data-type="Export">
+              <div class="custom-select-header"
+                onclick="toggleCustomerDropdown(this.closest('.custom-select-container'))">
+                เลือกลูกค้า <span class="arrow">▼</span>
+              </div>
+              <div class="custom-select-body">
+                <div class="top-bar">
+                  <input type="text" class="search-input" placeholder="ค้นหา..."
+                    oninput="filterCustomerOptions(this.closest('.custom-select-container'))" />
+                  <button class="add-btn" onclick="showAddCustomerInput(this.closest('.custom-select-container'))"
+                    type="button">+</button>
+                </div>
+                <div class="add-section" style="display:none;">
+                  <input type="text" class="new-item-input" placeholder="ชื่อลูกค้าใหม่..." />
+                  <button class="confirm-btn" onclick="addMasterCustomer(this)" type="button">ยืนยัน</button>
+                </div>
+                <div class="customer-option-list"></div>
+              </div>
+            </div>
+            <input type="hidden" name="customer" />
+          </div>
+
+          <div class="form-item"><label for="Product_type">ชนิดสินค้า</label><input type="text" id="Product_type"
+              name="Product_type" /></div>
+          <div class="form-item"><label for="arrivalTime_export">เวลาที่รถโรงงาน</label><input type="text"
+              id="arrivalTime_export" name="arrivalTime" /></div>
+          <div class="form-item"><label for="startUnload_export">เริ่มตั้งสินค้า </label><input type="text"
+              id="startUnload_export" name="startUnload" /></div>
+          <div class="form-item"><label for="endUnload_export">ตั้งสินค้าสำเร็จ</label><input type="text"
+              id="endUnload_export" name="endUnload" /></div>
+          <div class="form-item"><label for="truckUnload_export">รถเข้าช่องโหลด</label><input type="text"
+              id="truckUnload_export" name="truckUnload" /></div>
+          <div class="form-item"><label for="startLoad_export">เริ่มโหลดสินค้า</label><input type="text"
+              id="startLoad_export" name="startLoad" /></div>
+          <div class="form-item"><label for="endLoad_export">โหลดสินค้าสำเร็จ</label><input type="text"
+              id="endLoad_export" name="endLoad" /></div>
+          <div class="form-item"><label>&nbsp;</label><button type="submit" class="submit-btn">บันทึก</button></div>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <section class="table-section">
+    <div class="Searchh">
+      <h3 id="tableDomesticHeader">ตาราง Domestic</h3>
+      <div class="SearchDomestic" style="padding: 5px;">
+        <input type="text" id="InputDomestic" placeholder="Search..." style="margin: 5px;">
+        <!-- <input type="date" style="margin: 5px;"> -->
+        <label for="star">Start</label>
+        <input type="date" id="startDateDomestic" style="margin: 5px;" placeholder="Start Date">
+        <label for="end">End</label>
+        <input type="date" id="endDateDomestic" style="margin: 5px;" placeholder="End Date">
+        <button type="submit" id="SearchDomestic"
+          style="background-color: #0078d7; color: #ffffff; font-weight: bold;">Search</button>
+        <button type="button" id="ExcelDomestic"
+          style="background-color: #00d72f; color: #ffffff; font-weight: bold;">Excel</button>
+        <button type="button" id="PDFDomestic"
+          style="background-color: #e81810; color: #ffffff; font-weight: bold;">PDF</button>
+      </div>
+    </div>
+    <table id="tableDomestic">
+      <thead>
+        <tr>
+          <th><input type="checkbox" onclick="toggleAllCheckboxes(this)"></th>
+          <th>ทะเบียน</th>
+          <th>ชื่อ</th>
+          <th>ผู้ขนส่ง</th>
+          <th>ลูกค้า</th>
+          <th>เวลาที่รถลงคิว</th>
+          <th>เริ่มตั้งสินค้า</th>
+          <th>ตั้งสินค้าสำเร็จ</th>
+          <th>ขนส่งตอบรับทะเบียน</th>
+          <th>รถเข้าโหลดสินค้า</th>
+          <th>เริ่มโหลดสินค้า</th>
+          <th>โหลดสินค้าสำเร็จ</th>
+          <th>เวลาส่งสินค้า</th>
+          <th>status</th>
+          <th>เวลาส่งถึงลูกค้า</th>
+          <th>Delivery Date</th>
+          <th>หมายเหตุ</th>
+          <th>Notification</th>
+        </tr>
+      </thead>
+      <tbody id="domesticTable">
+        {% for row in domestic_data %}
+        <tr data-id="{{ row.id }}" data-formtype="Domestic">
+          <td><input type="checkbox" class="row-checkbox"></td>
+          <td><input type="text" value="{{ row.plate }}" disabled></td>
+          <td><input type="text" value="{{ row.name }}" disabled></td>
+          <td><input type="text" value="{{ row.sender }}" disabled></td>
+          <td><input type="text" value="{{ row.customer }}" disabled></td>
+          <td><input type="text" value="{{ row.queuetime }}" disabled></td>
+          <td><input type="text" value="{{ row.startdeliver }}" disabled></td>
+          <td><input type="text" value="{{ row.donedeliver }}" disabled></td>
+          <td><input type="text" value="{{ row.confirmregis }}" disabled></td>
+          <td><input type="text" value="{{ row.truckloadin }}" disabled></td>
+          <td><input type="text" value="{{ row.startload }}" disabled></td>
+          <td><input type="text" value="{{ row.doneload }}" disabled></td>
+          <td><input type="text" value="{{ row.deliverytime }}" disabled></td>
+          <td><input type="text" value="{{ row.status }}" disabled></td>
+          <td><input type="text" value="{{ row.deliverytimetocustomer }}" disabled></td>
+          <td><input type="text" value="{{ row.deliverydate }}" disabled></td>
+          <td><input type="text" value="{{ row.remark }}" disabled></td>
+          <td>
+            <button class="btn-edit" onclick="toggleEditSave(this)">Edit</button>
+            <button class="btn-delete" onclick="deleteRow(this)">Delete</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div id="wrapperDomestic" class="form-wrapper">
+      <div id="pagination-controls-domestic" style="margin-top: 10px; text-align: center;"></div>
+    </div>
+    <button id="btnLineDomestic" onclick="sendLineNotifyByForm('Domestic')" class="submit-btn"
+      style="margin: 10px 0;">Update LINE - Domestic</button>
+    <div class="Searchh">
+      <h3 id="tableExportHeader">ตาราง Export</h3>
+      <div class="SearchExport" style="padding: 5px;">
+        <input type="text" id="InputExport" placeholder="Search..." style="margin: 5px;">
+        <!-- <input type="date" style="margin: 5px;"> -->
+        <label for="star">Start</label>
+        <input type="date" id="startDateExport" style="margin: 5px;" placeholder="Start Date">
+        <label for="end">End</label>
+        <input type="date" id="endDateExport" style="margin: 5px;" placeholder="End Date">
+        <button type="submit" id="SearchExport"
+          style="background-color: #0078d7; color: #ffffff; font-weight: bold;">Search</button>
+        <button type="button" id="ExcelExport"
+          style="background-color: #00d72f; color: #ffffff; font-weight: bold;">Excel</button>
+        <button type="button" id="PDFExport"
+          style="background-color: #e81810; color: #ffffff; font-weight: bold;">PDF</button>
+      </div>
+    </div>
+    <table id="tableExport">
+      <thead>
+        <tr>
+          <th><input type="checkbox" onclick="toggleAllCheckboxes(this)"></th>
+          <th>PI</th>
+          <th>EO</th>
+          <th>เบอร์ตู้</th>
+          <th>ทะเบียน</th>
+          <th>ชื่อ</th>
+          <th>ผู้ขนส่ง</th>
+          <th>ประเทศ</th>
+          <th>ชนิดสินค้า</th>
+          <th>เวลาที่รถถึงโรงงาน</th>
+          <th>เริ่มตั้งสินค้า</th>
+          <th>ตั้งสินค้าสำเร็จ</th>
+          <th>รถเข้าช่องโหลด</th>
+          <th>เริ่มโหลดสินค้า</th>
+          <th>โหลดสินค้าสำเร็จ</th>
+          <th>หมายเหตุ</th>
+          <th>Notification</th>
+        </tr>
+      </thead>
+      <tbody id="exportTable">
+        {% for row in export_data %}
+        <tr data-id="{{ row.id }}" data-formtype="Export">
+          <td><input type="checkbox" class="row-checkbox"></td>
+          <td><input type="text" value="{{ row.pi }}" disabled></td>
+          <td><input type="text" value="{{ row.eo }}" disabled></td>
+          <td><input type="text" value="{{ row.containernumber }}" disabled></td>
+          <td><input type="text" value="{{ row.plate }}" disabled></td>
+          <td><input type="text" value="{{ row.name }}" disabled></td>
+          <td><input type="text" value="{{ row.sender }}" disabled></td>
+          <td><input type="text" value="{{ row.customer }}" disabled></td>
+          <td><input type="text" value="{{ row.producttype }}" disabled></td>
+          <td><input type="text" value="{{ row.queuetime }}" disabled></td>
+          <td><input type="text" value="{{ row.startdeliver }}" disabled></td>
+          <td><input type="text" value="{{ row.donedeliver }}" disabled></td>
+          <td><input type="text" value="{{ row.truckloadin }}" disabled></td>
+          <td><input type="text" value="{{ row.startload }}" disabled></td>
+          <td><input type="text" value="{{ row.doneload }}" disabled></td>
+          <td><input type="text" value="{{ row.remark }}" disabled></td>
+          <td>
+            <button class="btn-edit" onclick="toggleEditSave(this)">Edit</button>
+            <button class="btn-delete" onclick="deleteRow(this)">Delete</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div id="wrapperExport" class="form-wrapper">
+      <div id="pagination-controls-export" style="margin-top: 10px; text-align: center;"></div>
+    </div>
+    <button id="btnLineExport" onclick="sendLineNotifyByForm('Export')" class="submit-btn"
+      style="margin: 10px 0;">Update LINE - Export</button>
+  </section>
+
+  <!-- Modal -->
+  <div id="userModal"
+    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:#000000aa; justify-content:center; align-items:center;">
+    <div style="background:white; padding:20px; max-height:80vh; overflow-y:auto;">
+      <h3>เลือกรายชื่อ</h3>
+
+      <h4>👤 ผู้ใช้</h4>
+      <div id="userCheckboxList"></div>
+
+      <h4>👥 กลุ่ม</h4>
+      <div id="groupCheckboxList"></div>
+
+      <div class="buttons">
+        <button onclick="submitSelection()">ส่งข้อความ</button>
+        <button onclick="document.getElementById('userModal').style.display='none'" class="close-btn">ปิด</button>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <p>WICE SUPPLY CHAIN SOLUTIONS</p>
+  </footer>
+  <script src="{{ url_for('static', filename='js.js') }}"></script>
+  <script src="{{ url_for('static', filename='xlsx.js') }}"></script>
+</body>
+
+</html>
