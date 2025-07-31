@@ -170,7 +170,11 @@ function toggleEditSave(btn) {
         truckUnload: inputs[7].value,
         startLoad: inputs[8].value,
         endLoad: inputs[9].value,
-        remark: inputs[10].value,
+        Pi: inputs[10].value,
+        Eo: inputs[11].value,
+        Container_number: inputs[12].value,
+        Product_type: inputs[13].value,
+        remark: inputs[14].value,
       };
     }
 
