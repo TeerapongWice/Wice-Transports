@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: wice-transport
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wice-db
+          property: connectionString
+databases:
+  - name: wice-db
