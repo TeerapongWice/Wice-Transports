@@ -44,3 +44,4 @@ user_ids.txt
 # Ignore sqlite database file
 wice_transport.sqlite
 File_Excel_Templates/
+database.laccdb
