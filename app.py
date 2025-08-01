@@ -11,6 +11,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from functools import partial
 import subprocess, time, requests, json, os, pytz, sys, bcrypt, psycopg2
 from psycopg2.extras import RealDictCursor
@@ -994,6 +995,40 @@ def draw_header(canvas, doc, form_type):
 
     canvas.restoreState()
 
+# def truncate_text(text, font_name, font_size, max_width):
+#     """ตัดข้อความให้พอดีกับความกว้าง max_width และเติม ... หากเกิน"""
+#     if not isinstance(text, str):
+#         text = str(text)
+    
+#     if stringWidth(text, font_name, font_size) <= max_width:
+#         return text
+
+#     while stringWidth(text + "...", font_name, font_size) > max_width and len(text) > 0:
+#         text = text[:-1]
+
+#     return text + "..."
+
+from reportlab.pdfbase.pdfmetrics import stringWidth
+
+def truncate_text(text, font_name, font_size, max_width):
+    """ตัดข้อความให้พอดีกับความกว้าง max_width และเติม ... หากเกิน"""
+    if not isinstance(text, str):
+        text = str(text)
+
+    ellipsis = "..."
+    ellipsis_width = stringWidth(ellipsis, font_name, font_size)
+
+    # ปรับลด max_width ลงเล็กน้อยเพื่อให้เผื่อความกว้างของ ...
+    target_width = max_width - ellipsis_width - 2  # ลบเพิ่มอีกนิดเพื่อให้ตัดเร็วขึ้น
+
+    while stringWidth(text, font_name, font_size) > target_width and len(text) > 0:
+        text = text[:-1]
+
+    if len(text) < len(str(text)):
+        return text + ellipsis
+    else:
+        return text
+    
 @app.route('/export_pdf', methods=['POST'])
 def export_pdf():
     data = request.get_json()
@@ -1071,10 +1106,24 @@ def export_pdf():
 
     # สร้างข้อมูลตาราง: แถวหัว + แถวข้อมูล
     # ตรวจสอบการเข้าถึงข้อมูลใน row ให้เป็น row[col.lower()]
+    # data_rows = [
+    #     [str(row.get(col.lower(), "")) for col in columns]
+    #     for row in table_data
+    # ]
+    font_size = 9  # กำหนด font size ที่ใช้
     data_rows = [
-        [str(row.get(col.lower(), "")) for col in columns]
+        [
+            truncate_text(
+                str(row.get(col.lower(), "")),
+                default_font,
+                font_size,
+                col_width_map.get(col.lower(), 25 * mm)
+            )
+            for col in columns
+        ]
         for row in table_data
     ]
+
 
     pdf_table_data = [headers] + data_rows
 
