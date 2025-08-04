@@ -17,8 +17,15 @@ import subprocess, time, requests, json, os, pytz, sys, bcrypt, psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2 import errors as pg_errors # Import PostgreSQL specific errors
 from dotenv import load_dotenv
-load_dotenv()
+from PIL import Image, ImageDraw, ImageFont
+import io
+from linebot.v3.messaging import MessagingApi, PushMessageRequest
+from linebot.v3.messaging.models import ImageMessage
+from linebot import LineBotApi, WebhookHandler
+from linebot.models import ImageSendMessage
+import base64
 
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "fallback-secret")
@@ -36,6 +43,8 @@ else:
     # ถูกรันจาก .py ปกติ
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
+UPLOAD_FOLDER = 'static/uploads'
 # NGROK_PATH = "ngrok.exe"
 # PORT = 5000
 PORT = int(os.environ.get('PORT', 5000))
@@ -53,7 +62,7 @@ if not DATABASE_URL:
 
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
-    
+
 @app.route('/api/users')
 def get_users():
     try:
@@ -268,113 +277,350 @@ def get_user_ids():
     users = [{'userId': row['userid'], 'displayName': row['displayname'], 'pictureUrl': row['pictureurl']} for row in rows] # PostgreSQL จะแปลงชื่อคอลัมน์เป็น lowercase
     return jsonify({'users': users})
 
-@app.route('/send_line_to_selected', methods=['POST'])
-def send_line_notify():
-    try:
-        data = request.get_json(force=True)
-        if not data:
-            return jsonify({'success': False, 'error': 'No JSON received'}), 400
+# @app.route('/send_line_to_selected', methods=['POST'])
+# def send_line_notify():
+#     try:
+#         data = request.get_json(force=True)
+#         if not data:
+#             return jsonify({'success': False, 'error': 'No JSON received'}), 400
 
-        user_ids = data.get('user_ids', [])
-        group_ids = data.get('group_ids', [])
-        row_ids = data.get('ids', [])
-        form_type = data.get('formType')
+#         user_ids = data.get('user_ids', [])
+#         group_ids = data.get('group_ids', [])
+#         row_ids = data.get('ids', [])
+#         form_type = data.get('formType')
 
-        print('user_ids:', user_ids)
-        print('group_ids:', group_ids)
-        print('row_ids:', row_ids)
-        print('formType:', form_type)
+#         print('user_ids:', user_ids)
+#         print('group_ids:', group_ids)
+#         print('row_ids:', row_ids)
+#         print('formType:', form_type)
 
-        if not row_ids:
-            return jsonify({'success': False, 'error': 'No row_ids provided to send LINE message.'}), 400
+#         if not row_ids:
+#             return jsonify({'success': False, 'error': 'No row_ids provided to send LINE message.'}), 400
 
-        # ดึงข้อมูลจาก Transports เฉพาะรายการที่เลือก
-        # ใช้ %s สำหรับ PostgreSQL parameters และปรับเปลี่ยน IN clause
-        placeholders = ','.join(['%s'] * len(row_ids))
-        conn = get_db_connection()
-        # ใช้ RealDictCursor เพื่อให้เข้าถึงข้อมูลด้วยชื่อคอลัมน์ได้ง่ายขึ้น
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        query = f"SELECT * FROM Transports WHERE ID IN ({placeholders}) AND FormType = %s"
-        cursor.execute(query, (*row_ids, form_type))
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
+#         # ดึงข้อมูลจาก Transports เฉพาะรายการที่เลือก
+#         # ใช้ %s สำหรับ PostgreSQL parameters และปรับเปลี่ยน IN clause
+#         placeholders = ','.join(['%s'] * len(row_ids))
+#         conn = get_db_connection()
+#         # ใช้ RealDictCursor เพื่อให้เข้าถึงข้อมูลด้วยชื่อคอลัมน์ได้ง่ายขึ้น
+#         cursor = conn.cursor(cursor_factory=RealDictCursor)
+#         query = f"SELECT * FROM Transports WHERE ID IN ({placeholders}) AND FormType = %s"
+#         cursor.execute(query, (*row_ids, form_type))
+#         rows = cursor.fetchall()
+#         cursor.close()
+#         conn.close()
 
-        for row in rows:
-            # PostgreSQL มักจะคืนชื่อคอลัมน์เป็น lowercase
-            if form_type.lower() == "domestic": # ใช้ .lower() เพื่อความชัวร์
-                msg = (
-                    f"ทะเบียน: {row.get('plate', '-')}\n"
-                    f"ชื่อ: {row.get('name', '-')}\n"
-                    f"ผู้ขนส่ง: {row.get('sender', '-')}\n"
-                    f"ลูกค้า: {row.get('customer', '-')}\n"
-                    f"Delivery Date: {row.get('deliverydate', '-')}\n"
-                    f"เริ่มโหลดสินค้า: {row.get('startload', '-')}\n"
-                    f"โหลดสินค้าเสร็จ: {row.get('doneload', '-')}\n"
-                    f"เวลาส่งสินค้า: {row.get('deliverytime', '-')}\n"
-                    f"Status: {row.get('status', '-')}\n"
-                    f"เวลาส่งถึงลูกค้า: {row.get('deliverytimetocustomer', '-')}\n"
-                    f"หมายเหตุ: {row.get('remark', '-')}\n"
-                    f"---------------------------"
-                )
-            elif form_type.lower() == "export": # ใช้ .lower() เพื่อความชัวร์
-                msg = (
-                    f"PI: {row.get('pi', '-')}\n"
-                    f"ทะเบียน: {row.get('plate', '-')}\n"
-                    f"ชื่อ: {row.get('name', '-')}\n"
-                    f"ผู้ขนส่ง: {row.get('sender', '-')}\n"
-                    f"ประเทศ: {row.get('customer', '-')}\n"
-                    f"ถึงโรงงาน: {row.get('queuetime', '-')}\n"
-                    f"เริ่มตั้ง: {row.get('startdeliver', '-')}\n"
-                    f"ตั้งเสร็จ: {row.get('donedeliver', '-')}\n"
-                    f"เข้าช่องโหลด: {row.get('truckloadin', '-')}\n"
-                    f"เริ่มโหลด: {row.get('startload', '-')}\n"
-                    f"โหลดเสร็จ: {row.get('doneload', '-')}\n"
-                    f"หมายเหตุ: {row.get('remark', '-')}\n"
-                    f"---------------------------"
-                )
+#         for row in rows:
+#             # PostgreSQL มักจะคืนชื่อคอลัมน์เป็น lowercase
+#             if form_type.lower() == "domestic": # ใช้ .lower() เพื่อความชัวร์
+#                 msg = (
+#                     f"ทะเบียน: {row.get('plate', '-')}\n"
+#                     f"ชื่อ: {row.get('name', '-')}\n"
+#                     f"ผู้ขนส่ง: {row.get('sender', '-')}\n"
+#                     f"ลูกค้า: {row.get('customer', '-')}\n"
+#                     f"Delivery Date: {row.get('deliverydate', '-')}\n"
+#                     f"เริ่มโหลดสินค้า: {row.get('startload', '-')}\n"
+#                     f"โหลดสินค้าเสร็จ: {row.get('doneload', '-')}\n"
+#                     f"เวลาส่งสินค้า: {row.get('deliverytime', '-')}\n"
+#                     f"Status: {row.get('status', '-')}\n"
+#                     f"เวลาส่งถึงลูกค้า: {row.get('deliverytimetocustomer', '-')}\n"
+#                     f"หมายเหตุ: {row.get('remark', '-')}\n"
+#                     f"---------------------------"
+#                 )
+#             elif form_type.lower() == "export": # ใช้ .lower() เพื่อความชัวร์
+#                 msg = (
+#                     f"PI: {row.get('pi', '-')}\n"
+#                     f"ทะเบียน: {row.get('plate', '-')}\n"
+#                     f"ชื่อ: {row.get('name', '-')}\n"
+#                     f"ผู้ขนส่ง: {row.get('sender', '-')}\n"
+#                     f"ประเทศ: {row.get('customer', '-')}\n"
+#                     f"ถึงโรงงาน: {row.get('queuetime', '-')}\n"
+#                     f"เริ่มตั้ง: {row.get('startdeliver', '-')}\n"
+#                     f"ตั้งเสร็จ: {row.get('donedeliver', '-')}\n"
+#                     f"เข้าช่องโหลด: {row.get('truckloadin', '-')}\n"
+#                     f"เริ่มโหลด: {row.get('startload', '-')}\n"
+#                     f"โหลดเสร็จ: {row.get('doneload', '-')}\n"
+#                     f"หมายเหตุ: {row.get('remark', '-')}\n"
+#                     f"---------------------------"
+#                 )
+#             else:
+#                 continue
+
+#             # เตรียมข้อความพร้อม prefix
+#             short_message = f"[WICE TRANSPORT - {form_type.upper()}]\n\n" + msg[:950]  # Limit for LINE push
+
+#             # ส่งไปยัง user แต่ละคน
+#             for uid in user_ids:
+#                 success = send_line_message(uid, short_message)
+#                 print(f"ส่งหา {uid}: {'✅ สำเร็จ' if success else '❌ ล้มเหลว'}")
+
+#             # ส่งไปยัง group แต่ละกลุ่ม
+#             for gid in group_ids:
+#                 success = send_line_message_to_group(gid, short_message)
+#                 print(f"ส่งหา {gid}: {'✅ สำเร็จ' if success else '❌ ล้มเหลว'}")
+
+#         return jsonify({'success': True})
+
+#     except Exception as e:
+#         print("❌ Error sending LINE message:", e)
+#         return jsonify({'success': False, 'error': str(e)}), 400
+
+def save_image(image_pil, filename=None):
+    if not filename:
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"image_{timestamp}.jpg"
+    
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    image_pil.save(filepath)
+    return filename  # หรือจะ return full path ก็ได้
+
+def save_to_db(filename):
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # เพิ่มคอลัมน์ timestamp ไว้เก็บวันเวลาที่บันทึก (หากมีใน table)
+    cursor.execute("""
+        INSERT INTO images (filename, uploaded_at)
+        VALUES (%s, %s)
+    """, (filename, datetime.now()))
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def load_thai_font(size: int = 20, bold: bool = False) -> ImageFont.FreeTypeFont:
+    """
+    โหลดฟอนต์ไทย Regular หรือ Bold ตามพารามิเตอร์ bold
+    ถ้าไม่พบจะใช้ฟอนต์ดีฟอลต์ของ Pillow แทน
+    """
+    if bold:
+        candidate_paths = [
+            "fonts/THSarabunNew-Bold.ttf",
+            "fonts/THSarabunNew.ttf",  # fallback ถ้าไม่มี bold
+        ]
+    else:
+        candidate_paths = [
+            "fonts/THSarabunNew.ttf",
+        ]
+
+    for path in candidate_paths:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            continue
+
+    print("⚠️  ไม่พบฟอนต์ไทยที่ระบุ ใช้ฟอนต์ดีฟอลต์แทน")
+    return ImageFont.load_default()
+
+def generate_image_table_from_rows(rows, form_type: str, company_logo=None):
+    company_logo = Image.open("static/Img/LogoTransport.png")
+    font_size = 22
+    font = load_thai_font(font_size)
+    font_bold = load_thai_font(font_size, bold=True)
+    padding_x = 10
+    padding_y = 5
+
+    headers_domestic = [
+        "ทะเบียน", "ชื่อ", "ผู้ขนส่ง", "ลูกค้า",
+        "Delivery Date", "เริ่มโหลด", "โหลดเสร็จ",
+        "เวลาส่ง", "Status", "ถึงลูกค้า", "หมายเหตุ"
+    ]
+
+    headers_export = [
+        "PI", "ทะเบียน", "ชื่อ", "ผู้ขนส่ง", "ประเทศ",
+        "ถึงโรงงาน", "เริ่มตั้ง", "ตั้งเสร็จ", "เข้าช่องโหลด",
+        "เริ่มโหลด", "โหลดเสร็จ", "หมายเหตุ"
+    ]
+
+
+    headers = headers_domestic if form_type == "domestic" else headers_export
+
+    def extract_row(row, index):
+        if form_type == "domestic":
+            return [
+                str(row.get("plate") or ""),
+                str(row.get("name") or ""),
+                str(row.get("sender") or ""),
+                str(row.get("customer") or ""),
+                str(row.get("deliverydate") or ""),
+                str(row.get("startload") or ""),
+                str(row.get("doneload") or ""),
+                str(row.get("deliverytime") or ""),
+                str(row.get("status") or ""),
+                str(row.get("deliverytimetocustomer") or ""),
+                str(row.get("remark") or ""),
+            ]
+        else:
+            return [
+                str(row.get("pi") or ""),
+                str(row.get("plate") or ""),
+                str(row.get("name") or ""),
+                str(row.get("sender") or ""),
+                str(row.get("customer") or ""),
+                str(row.get("queuetime") or ""),
+                str(row.get("startdeliver") or ""),
+                str(row.get("donedeliver") or ""),
+                str(row.get("truckloadin") or ""),
+                str(row.get("startload") or ""),
+                str(row.get("doneload") or ""),
+                str(row.get("remark") or ""),
+            ]
+
+    table_data = [headers] + [extract_row(row, i) for i, row in enumerate(rows)]
+
+    # คำนวณขนาดคอลัมน์
+    dummy_img = Image.new("RGB", (1, 1))
+    draw = ImageDraw.Draw(dummy_img)
+    col_widths = []
+
+    for col in zip(*table_data):
+        max_w = max(draw.textbbox((0, 0), c, font=font_bold)[2] for c in col)
+        col_widths.append(max_w + 20)
+
+    row_height = font_size + 10
+    table_width = sum(col_widths)
+    # table_height = len(table_data) * row_height + 20
+    table_height = len(table_data) * row_height  # 🔧 ปรับตรงนี้
+
+    # ⬇️ ถ้ามีโลโก้ให้เว้นที่ด้านบน
+    logo_margin = 20
+    logo_height = 150 if company_logo else 0
+    canvas_height = table_height + logo_height + logo_margin
+
+    img = Image.new("RGB", (table_width, canvas_height), "white")
+    draw = ImageDraw.Draw(img)
+
+     # 🔵 แปะโลโก้ที่มุมซ้ายบน
+    if company_logo:
+        resized_logo = company_logo.resize((150, 150))
+        img.paste(resized_logo, (10, 10))
+
+        # ข้อความทั้งหมด
+        now_str = datetime.now().strftime("%H:%M:%S")
+        text_before_time = "อัดเดพสถานะรถล่าสุดเวลา "
+        text_time = now_str
+
+        bbox_before = draw.textbbox((0, 0), text_before_time, font=font_bold)
+        w_before = bbox_before[2] - bbox_before[0]
+        h = bbox_before[3] - bbox_before[1]
+
+        bbox_time = draw.textbbox((0, 0), text_time, font=font_bold)
+        w_time = bbox_time[2] - bbox_time[0]
+
+
+        # รวมความกว้างข้อความทั้งหมด
+        total_text_width = w_before + w_time
+
+        # คำนวณตำแหน่งข้อความให้อยู่กึ่งกลางแนวนอนของภาพ
+        center_x = table_width // 2
+        text_x_start = center_x - total_text_width // 2
+        text_y = 10 + (150 - h) // 2  # แนวตั้งให้อยู่กลางโลโก้พอดี
+
+        # วาดข้อความก่อนเวลา (สีดำ ตัวหนา)
+        draw.text((text_x_start, text_y), text_before_time, font=font_bold, fill="black")
+
+        # วาดข้อความเวลา (สีแดง ตัวหนา) ต่อจากข้อความก่อนเวลา
+        draw.text((text_x_start + w_before, text_y), text_time, font=font_bold, fill="red")
+
+        # วาดตาราง เริ่มที่ y ต่ำกว่าโลโก้
+        start_table_y = logo_height + logo_margin
+
+
+    for row_idx, row in enumerate(table_data):
+        y = row_idx * row_height + start_table_y
+        x = 0
+        for col_idx, cell in enumerate(row):
+            if row_idx == 0:
+                draw.rectangle([x, y, x + col_widths[col_idx], y + row_height], fill="#000080")
+                text_color = "white"
+                draw.text((x + padding_x, y + padding_y), str(cell), font=font_bold, fill=text_color)
             else:
-                continue
+                text_color = "black"
+                draw.text((x + 10, y), str(cell), font=font, fill=text_color)
+            x += col_widths[col_idx]
 
-            # เตรียมข้อความพร้อม prefix
-            short_message = f"[WICE TRANSPORT - {form_type.upper()}]\n\n" + msg[:950]  # Limit for LINE push
+    # วาดเส้นแนวนอน
+    # for i in range(len(table_data) + 1):
+    #     y = i * row_height + 10
+    #     draw.line([(0, y), (table_width, y)], fill="gray", width=1)
 
-            # ส่งไปยัง user แต่ละคน
-            for uid in user_ids:
-                success = send_line_message(uid, short_message)
-                print(f"ส่งหา {uid}: {'✅ สำเร็จ' if success else '❌ ล้มเหลว'}")
+    # วาดเส้นแนวตั้ง
+    # x = 0
+    # for width in col_widths:
+    #     draw.line([(x, 0), (x, table_height)], fill="gray", width=1)
+    #     x += width
+    # draw.line([(x, 0), (x, table_height)], fill="gray", width=1)
 
-            # ส่งไปยัง group แต่ละกลุ่ม
-            for gid in group_ids:
-                success = send_line_message_to_group(gid, short_message)
-                print(f"ส่งหา {gid}: {'✅ สำเร็จ' if success else '❌ ล้มเหลว'}")
+    # Export image
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
 
-        return jsonify({'success': True})
+@app.route('/send_line_to_selected', methods=['POST'])
+def send_line_to_selected():
+    data = request.json
+
+    user_ids = data.get('user_ids', [])
+    group_ids = data.get('group_ids', [])
+    ids = data.get('ids', [])
+    form_type = data.get('formType', '').lower()
+
+    if not user_ids or not ids or not form_type:
+        return jsonify({'error': 'user_ids, ids or formType missing'}), 400
+
+    # ดึงข้อมูลจาก DB ตาม ids ที่รับมา
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # แปลง ids เป็น tuple ของ int
+        ids_int = tuple(map(int, ids))
+        query = f"SELECT * FROM Transports WHERE id IN %s"
+        cur.execute(query, (ids_int,))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        return jsonify({'error': f'Database error: {e}'}), 500
+
+    # สร้างรูปภาพ
+    image_buf = generate_image_table_from_rows(rows, form_type)
+
+    # ส่งรูปภาพไปยัง user_ids แต่ละคน
+    results = {}
+    for uid in user_ids:
+        success = send_line_image_push(uid, image_buf)
+        results[uid] = success
+
+    return jsonify({'results': results})
+
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+
+def send_line_image_push(user_id, image_buf):
+    image_buf.seek(0)
+    image_pil = Image.open(image_buf)
+
+    # ✅ บันทึกภาพลงเซิร์ฟเวอร์
+    filename = save_image(image_pil)
+    
+    # ✅ เก็บชื่อภาพไว้ใน database
+    save_to_db(filename)
+
+    # ✅ สร้าง URL
+    image_url = f"https://wice-transports-1.onrender.com/static/uploads/{filename}"
+
+    try:
+        message = ImageSendMessage(
+            original_content_url=image_url,
+            preview_image_url=image_url
+        )
+
+        line_bot_api.push_message(user_id, message)
+        print(f"✅ ส่งรูปภาพไปยัง {user_id} สำเร็จ")
+        return True
 
     except Exception as e:
-        print("❌ Error sending LINE message:", e)
-        return jsonify({'success': False, 'error': str(e)}), 400
-
-def send_welcome_message(reply_token):
-    url = 'https://api.line.me/v2/bot/message/reply'
-    headers = {
-        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
-    }
-    data = {
-        "replyToken": reply_token,
-        "messages": [
-            {
-                "type": "text",
-                "text": "สวัสดีครับ! ขอบคุณที่เชิญบอทเข้ากลุ่มครับ"
-            }
-        ]
-    }
-    resp = requests.post(url, headers=headers, json=data)
-    if resp.status_code == 200:
-        print("✅ ส่งข้อความทักทายสำเร็จ")
-    else:
-        print(f"❌ ส่งข้อความทักทายไม่สำเร็จ: {resp.status_code} {resp.text}")
+        print(f"❌ ส่งรูปภาพไปยัง {user_id} ล้มเหลว:", e)
+        return False
 
 @app.route("/callback", methods=['POST'])
 def callback():
