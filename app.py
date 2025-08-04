@@ -363,15 +363,19 @@ def get_user_ids():
 #     except Exception as e:
 #         print("❌ Error sending LINE message:", e)
 #         return jsonify({'success': False, 'error': str(e)}), 400
+UPLOAD_FOLDER = 'static/uploads'
 
 def save_image(image_pil, filename=None):
     if not filename:
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         filename = f"image_{timestamp}.jpg"
-    
+
+    # ✅ สร้างโฟลเดอร์ static/uploads ถ้ายังไม่มี
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     image_pil.save(filepath)
-    return filename  # หรือจะ return full path ก็ได้
+    return filename
 
 def save_to_db(filename):
     conn = get_db_connection()
