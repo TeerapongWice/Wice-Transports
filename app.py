@@ -606,50 +606,128 @@ def generate_image_table_from_rows(rows, form_type: str, company_logo=None):
 #         results[uid] = success
 
 #     return jsonify({'results': results})
+# @app.route('/send_line_to_selected', methods=['POST'])
+# def send_line_to_selected():
+#     data = request.json
+
+#     user_ids = data.get('user_ids', [])     # รายชื่อ user ID ที่จะส่ง
+#     group_ids = data.get('group_ids', [])   # รายชื่อ group ID ที่จะส่ง
+#     ids = data.get('ids', [])               # ID ของข้อมูลในฐานข้อมูล
+#     form_type = data.get('formType', '').lower()  # ประเภทฟอร์ม (domestic/export)
+
+#     # ตรวจสอบว่ามี user_ids หรือ group_ids อย่างน้อยหนึ่งอย่าง + ids + formType
+#     if (not user_ids and not group_ids) or not ids or not form_type:
+#         return jsonify({'error': 'กรุณาระบุ user_ids หรือ group_ids พร้อมกับ ids และ formType'}), 400
+
+#     # ดึงข้อมูลจากฐานข้อมูลจากตาราง Transports ตาม ids ที่ส่งมา
+#     try:
+#         conn = get_db_connection()
+#         cur = conn.cursor(cursor_factory=RealDictCursor)
+#         ids_int = tuple(map(int, ids))  # แปลง ids ให้เป็น tuple ของจำนวนเต็ม
+#         query = "SELECT * FROM Transports WHERE id IN %s"
+#         cur.execute(query, (ids_int,))
+#         rows = cur.fetchall()
+#         cur.close()
+#         conn.close()
+#     except Exception as e:
+#         return jsonify({'error': f'เกิดข้อผิดพลาดที่ฐานข้อมูล: {e}'}), 500
+
+#     # สร้างรูปภาพจากข้อมูล rows
+#     image_buf = generate_image_table_from_rows(rows, form_type)
+
+#     # ส่งรูปภาพไปยัง user_ids ทีละคน
+#     results = {}
+#     for uid in user_ids:
+#         success = send_line_image_push(uid, image_buf)
+#         results[uid] = success
+
+#     # ส่งรูปภาพไปยัง group_ids ทีละกลุ่ม
+#     for gid in group_ids:
+#         success = send_line_image_push(gid, image_buf)
+#         results[gid] = success
+
+#     # ส่งผลลัพธ์กลับไป (ระบุว่า user/group ใดส่งสำเร็จหรือไม่)
+#     return jsonify({'results': results})
 @app.route('/send_line_to_selected', methods=['POST'])
-def send_line_to_selected():
-    data = request.json
-
-    user_ids = data.get('user_ids', [])     # รายชื่อ user ID ที่จะส่ง
-    group_ids = data.get('group_ids', [])   # รายชื่อ group ID ที่จะส่ง
-    ids = data.get('ids', [])               # ID ของข้อมูลในฐานข้อมูล
-    form_type = data.get('formType', '').lower()  # ประเภทฟอร์ม (domestic/export)
-
-    # ตรวจสอบว่ามี user_ids หรือ group_ids อย่างน้อยหนึ่งอย่าง + ids + formType
-    if (not user_ids and not group_ids) or not ids or not form_type:
-        return jsonify({'error': 'กรุณาระบุ user_ids หรือ group_ids พร้อมกับ ids และ formType'}), 400
-
-    # ดึงข้อมูลจากฐานข้อมูลจากตาราง Transports ตาม ids ที่ส่งมา
+def send_line_with_image_to_selected():
     try:
+        data = request.get_json(force=True)
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON received'}), 400
+
+        user_ids = data.get('user_ids', [])
+        group_ids = data.get('group_ids', [])
+        row_ids = data.get('ids', [])
+        form_type = data.get('formType', '').lower()
+
+        if not (user_ids or group_ids) or not row_ids or not form_type:
+            return jsonify({'success': False, 'error': 'user_ids/group_ids, ids or formType missing'}), 400
+
+        print('user_ids:', user_ids)
+        print('group_ids:', group_ids)
+        print('row_ids:', row_ids)
+        print('formType:', form_type)
+
+        # ดึงข้อมูลจาก Transports
+        placeholders = ','.join('?' for _ in row_ids)
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        ids_int = tuple(map(int, ids))  # แปลง ids ให้เป็น tuple ของจำนวนเต็ม
-        query = "SELECT * FROM Transports WHERE id IN %s"
-        cur.execute(query, (ids_int,))
-        rows = cur.fetchall()
-        cur.close()
+        cursor = conn.cursor()
+        query = f"SELECT * FROM Transports WHERE ID IN ({placeholders}) AND FormType = ?"
+        cursor.execute(query, (*row_ids, form_type.capitalize()))
+        rows = cursor.fetchall()
         conn.close()
+
+        # ถ้าไม่มีข้อมูลเลย
+        if not rows:
+            return jsonify({'success': False, 'error': 'ไม่พบข้อมูลตาม ID ที่ระบุ'}), 404
+
+        # ✅ สร้างรูปภาพจากข้อมูล rows
+        image_buf = generate_image_table_from_rows(rows, form_type)
+
+        # ✅ แปลงเป็นรูปภาพ PIL และบันทึกลงเซิร์ฟเวอร์
+        image_buf.seek(0)
+        image_pil = Image.open(image_buf)
+        filename = save_image(image_pil)
+
+        # ✅ เก็บลงฐานข้อมูล
+        save_to_db(filename)
+
+        # ✅ URL รูปภาพ
+        image_url = f"https://wice-transports-1.onrender.com/static/uploads/{filename}"
+
+        # ✅ สร้าง message
+        message = ImageSendMessage(
+            original_content_url=image_url,
+            preview_image_url=image_url
+        )
+
+        results = {}
+
+        # ✅ ส่งหาผู้ใช้
+        for uid in user_ids:
+            try:
+                line_bot_api.push_message(uid, message)
+                print(f"✅ ส่งภาพไปยัง USER {uid} สำเร็จ")
+                results[uid] = True
+            except Exception as e:
+                print(f"❌ ส่งภาพไปยัง USER {uid} ล้มเหลว:", e)
+                results[uid] = False
+
+        # ✅ ส่งหากลุ่ม
+        for gid in group_ids:
+            try:
+                line_bot_api.push_message(gid, message)
+                print(f"✅ ส่งภาพไปยัง GROUP {gid} สำเร็จ")
+                results[gid] = True
+            except Exception as e:
+                print(f"❌ ส่งภาพไปยัง GROUP {gid} ล้มเหลว:", e)
+                results[gid] = False
+
+        return jsonify({'success': True, 'results': results})
+
     except Exception as e:
-        return jsonify({'error': f'เกิดข้อผิดพลาดที่ฐานข้อมูล: {e}'}), 500
-
-    # สร้างรูปภาพจากข้อมูล rows
-    image_buf = generate_image_table_from_rows(rows, form_type)
-
-    # ส่งรูปภาพไปยัง user_ids ทีละคน
-    results_user = {}
-    for uid in user_ids:
-        image_buf.seek(0)
-        results_user[uid] = send_line_image_push(uid, image_buf)
-
-    results_group = {}
-    for gid in group_ids:
-        image_buf.seek(0)
-        results_group[gid] = send_line_image_push(gid, image_buf)
-
-    return jsonify({
-        'results_user': results_user,
-        'results_group': results_group
-    })
+        print("❌ Error:", e)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 
