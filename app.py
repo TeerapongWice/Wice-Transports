@@ -42,9 +42,6 @@ if getattr(sys, 'frozen', False):
 else:
     # ถูกรันจาก .py ปกติ
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-UPLOAD_FOLDER = 'static/uploads'
 # NGROK_PATH = "ngrok.exe"
 # PORT = 5000
 PORT = int(os.environ.get('PORT', 5000))
@@ -639,18 +636,20 @@ def send_line_to_selected():
     image_buf = generate_image_table_from_rows(rows, form_type)
 
     # ส่งรูปภาพไปยัง user_ids ทีละคน
-    results = {}
+    results_user = {}
     for uid in user_ids:
-        success = send_line_image_push(uid, image_buf)
-        results[uid] = success
+        image_buf.seek(0)
+        results_user[uid] = send_line_image_push(uid, image_buf)
 
-    # ส่งรูปภาพไปยัง group_ids ทีละกลุ่ม
+    results_group = {}
     for gid in group_ids:
-        success = send_line_image_push(gid, image_buf)
-        results[gid] = success
+        image_buf.seek(0)
+        results_group[gid] = send_line_image_push(gid, image_buf)
 
-    # ส่งผลลัพธ์กลับไป (ระบุว่า user/group ใดส่งสำเร็จหรือไม่)
-    return jsonify({'results': results})
+    return jsonify({
+        'results_user': results_user,
+        'results_group': results_group
+    })
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 
