@@ -573,41 +573,83 @@ def generate_image_table_from_rows(rows, form_type: str, company_logo=None):
     buf.seek(0)
     return buf
 
+# @app.route('/send_line_to_selected', methods=['POST'])
+# def send_line_to_selected():
+#     data = request.json
+
+#     user_ids = data.get('user_ids', [])
+#     group_ids = data.get('group_ids', [])
+#     ids = data.get('ids', [])
+#     form_type = data.get('formType', '').lower()
+
+#     if not user_ids or not ids or not form_type:
+#         return jsonify({'error': 'user_ids, ids or formType missing'}), 400
+
+#     # ดึงข้อมูลจาก DB ตาม ids ที่รับมา
+#     try:
+#         conn = get_db_connection()
+#         cur = conn.cursor(cursor_factory=RealDictCursor)
+#         # แปลง ids เป็น tuple ของ int
+#         ids_int = tuple(map(int, ids))
+#         query = f"SELECT * FROM Transports WHERE id IN %s"
+#         cur.execute(query, (ids_int,))
+#         rows = cur.fetchall()
+#         cur.close()
+#         conn.close()
+#     except Exception as e:
+#         return jsonify({'error': f'Database error: {e}'}), 500
+
+#     # สร้างรูปภาพ
+#     image_buf = generate_image_table_from_rows(rows, form_type)
+
+#     # ส่งรูปภาพไปยัง user_ids แต่ละคน
+#     results = {}
+#     for uid in user_ids:
+#         success = send_line_image_push(uid, image_buf)
+#         results[uid] = success
+
+#     return jsonify({'results': results})
 @app.route('/send_line_to_selected', methods=['POST'])
 def send_line_to_selected():
     data = request.json
 
-    user_ids = data.get('user_ids', [])
-    group_ids = data.get('group_ids', [])
-    ids = data.get('ids', [])
-    form_type = data.get('formType', '').lower()
+    user_ids = data.get('user_ids', [])     # รายชื่อ user ID ที่จะส่ง
+    group_ids = data.get('group_ids', [])   # รายชื่อ group ID ที่จะส่ง
+    ids = data.get('ids', [])               # ID ของข้อมูลในฐานข้อมูล
+    form_type = data.get('formType', '').lower()  # ประเภทฟอร์ม (domestic/export)
 
-    if not user_ids or not ids or not form_type:
-        return jsonify({'error': 'user_ids, ids or formType missing'}), 400
+    # ตรวจสอบว่ามี user_ids หรือ group_ids อย่างน้อยหนึ่งอย่าง + ids + formType
+    if (not user_ids and not group_ids) or not ids or not form_type:
+        return jsonify({'error': 'กรุณาระบุ user_ids หรือ group_ids พร้อมกับ ids และ formType'}), 400
 
-    # ดึงข้อมูลจาก DB ตาม ids ที่รับมา
+    # ดึงข้อมูลจากฐานข้อมูลจากตาราง Transports ตาม ids ที่ส่งมา
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        # แปลง ids เป็น tuple ของ int
-        ids_int = tuple(map(int, ids))
-        query = f"SELECT * FROM Transports WHERE id IN %s"
+        ids_int = tuple(map(int, ids))  # แปลง ids ให้เป็น tuple ของจำนวนเต็ม
+        query = "SELECT * FROM Transports WHERE id IN %s"
         cur.execute(query, (ids_int,))
         rows = cur.fetchall()
         cur.close()
         conn.close()
     except Exception as e:
-        return jsonify({'error': f'Database error: {e}'}), 500
+        return jsonify({'error': f'เกิดข้อผิดพลาดที่ฐานข้อมูล: {e}'}), 500
 
-    # สร้างรูปภาพ
+    # สร้างรูปภาพจากข้อมูล rows
     image_buf = generate_image_table_from_rows(rows, form_type)
 
-    # ส่งรูปภาพไปยัง user_ids แต่ละคน
+    # ส่งรูปภาพไปยัง user_ids ทีละคน
     results = {}
     for uid in user_ids:
         success = send_line_image_push(uid, image_buf)
         results[uid] = success
 
+    # ส่งรูปภาพไปยัง group_ids ทีละกลุ่ม
+    for gid in group_ids:
+        success = send_line_image_push(gid, image_buf)
+        results[gid] = success
+
+    # ส่งผลลัพธ์กลับไป (ระบุว่า user/group ใดส่งสำเร็จหรือไม่)
     return jsonify({'results': results})
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
