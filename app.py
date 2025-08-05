@@ -42,6 +42,9 @@ if getattr(sys, 'frozen', False):
 else:
     # ถูกรันจาก .py ปกติ
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+UPLOAD_FOLDER = 'static/uploads'
 # NGROK_PATH = "ngrok.exe"
 # PORT = 5000
 PORT = int(os.environ.get('PORT', 5000))
@@ -155,17 +158,37 @@ def save_or_update_user(user_id):
     except Exception as e:
         print(f"❌ save_or_update_user error: {e}")
  
+# def get_group_profile(group_id):
+#     url = f'https://api.line.me/v2/bot/group/{group_id}/summary'
+#     headers = {
+#         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
+#     }
+#     res = requests.get(url, headers=headers)
+#     if res.status_code == 200:
+#         return res.json()  # จะได้ dict ที่มี groupName, pictureUrl
+#     else:
+#         print("❌ Error fetching group profile:", res.status_code, res.text)
+#         return None
 def get_group_profile(group_id):
     url = f'https://api.line.me/v2/bot/group/{group_id}/summary'
     headers = {
         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
     }
-    res = requests.get(url, headers=headers)
-    if res.status_code == 200:
-        return res.json()  # จะได้ dict ที่มี groupName, pictureUrl
-    else:
-        print("❌ Error fetching group profile:", res.status_code, res.text)
-        return None
+    
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+
+        if res.status_code == 200:
+            return res.json()
+        elif res.status_code == 404:
+            print(f"❌ Group profile not found: {group_id}")
+        else:
+            print(f"❌ Failed to fetch group profile ({res.status_code}): {res.text}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Exception during group profile request: {e}")
+    
+    return None
 
 def store_group_id(group_id, group_name=None, group_picture=None):
     conn = get_db_connection()
@@ -606,128 +629,47 @@ def generate_image_table_from_rows(rows, form_type: str, company_logo=None):
 #         results[uid] = success
 
 #     return jsonify({'results': results})
-# @app.route('/send_line_to_selected', methods=['POST'])
-# def send_line_to_selected():
-#     data = request.json
-
-#     user_ids = data.get('user_ids', [])     # รายชื่อ user ID ที่จะส่ง
-#     group_ids = data.get('group_ids', [])   # รายชื่อ group ID ที่จะส่ง
-#     ids = data.get('ids', [])               # ID ของข้อมูลในฐานข้อมูล
-#     form_type = data.get('formType', '').lower()  # ประเภทฟอร์ม (domestic/export)
-
-#     # ตรวจสอบว่ามี user_ids หรือ group_ids อย่างน้อยหนึ่งอย่าง + ids + formType
-#     if (not user_ids and not group_ids) or not ids or not form_type:
-#         return jsonify({'error': 'กรุณาระบุ user_ids หรือ group_ids พร้อมกับ ids และ formType'}), 400
-
-#     # ดึงข้อมูลจากฐานข้อมูลจากตาราง Transports ตาม ids ที่ส่งมา
-#     try:
-#         conn = get_db_connection()
-#         cur = conn.cursor(cursor_factory=RealDictCursor)
-#         ids_int = tuple(map(int, ids))  # แปลง ids ให้เป็น tuple ของจำนวนเต็ม
-#         query = "SELECT * FROM Transports WHERE id IN %s"
-#         cur.execute(query, (ids_int,))
-#         rows = cur.fetchall()
-#         cur.close()
-#         conn.close()
-#     except Exception as e:
-#         return jsonify({'error': f'เกิดข้อผิดพลาดที่ฐานข้อมูล: {e}'}), 500
-
-#     # สร้างรูปภาพจากข้อมูล rows
-#     image_buf = generate_image_table_from_rows(rows, form_type)
-
-#     # ส่งรูปภาพไปยัง user_ids ทีละคน
-#     results = {}
-#     for uid in user_ids:
-#         success = send_line_image_push(uid, image_buf)
-#         results[uid] = success
-
-#     # ส่งรูปภาพไปยัง group_ids ทีละกลุ่ม
-#     for gid in group_ids:
-#         success = send_line_image_push(gid, image_buf)
-#         results[gid] = success
-
-#     # ส่งผลลัพธ์กลับไป (ระบุว่า user/group ใดส่งสำเร็จหรือไม่)
-#     return jsonify({'results': results})
 @app.route('/send_line_to_selected', methods=['POST'])
-def send_line_with_image_to_selected():
+def send_line_to_selected():
+    data = request.json
+
+    user_ids = data.get('user_ids', [])
+    group_ids = data.get('group_ids', [])
+    ids = data.get('ids', [])
+    form_type = data.get('formType', '').lower()
+
+    if (not user_ids and not group_ids) or not ids or not form_type:
+        return jsonify({'error': 'user_ids/group_ids, ids or formType missing'}), 400
+
+    # ดึงข้อมูลจาก DB ตาม ids ที่รับมา
     try:
-        data = request.get_json(force=True)
-        if not data:
-            return jsonify({'success': False, 'error': 'No JSON received'}), 400
-
-        user_ids = data.get('user_ids', [])
-        group_ids = data.get('group_ids', [])
-        row_ids = data.get('ids', [])
-        form_type = data.get('formType', '').lower()
-
-        if not (user_ids or group_ids) or not row_ids or not form_type:
-            return jsonify({'success': False, 'error': 'user_ids/group_ids, ids or formType missing'}), 400
-
-        print('user_ids:', user_ids)
-        print('group_ids:', group_ids)
-        print('row_ids:', row_ids)
-        print('formType:', form_type)
-
-        # ดึงข้อมูลจาก Transports
-        placeholders = ','.join('?' for _ in row_ids)
         conn = get_db_connection()
-        cursor = conn.cursor()
-        query = f"SELECT * FROM Transports WHERE ID IN ({placeholders}) AND FormType = ?"
-        cursor.execute(query, (*row_ids, form_type.capitalize()))
-        rows = cursor.fetchall()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        ids_int = tuple(map(int, ids))
+        query = f"SELECT * FROM Transports WHERE id IN %s"
+        cur.execute(query, (ids_int,))
+        rows = cur.fetchall()
+        cur.close()
         conn.close()
-
-        # ถ้าไม่มีข้อมูลเลย
-        if not rows:
-            return jsonify({'success': False, 'error': 'ไม่พบข้อมูลตาม ID ที่ระบุ'}), 404
-
-        # ✅ สร้างรูปภาพจากข้อมูล rows
-        image_buf = generate_image_table_from_rows(rows, form_type)
-
-        # ✅ แปลงเป็นรูปภาพ PIL และบันทึกลงเซิร์ฟเวอร์
-        image_buf.seek(0)
-        image_pil = Image.open(image_buf)
-        filename = save_image(image_pil)
-
-        # ✅ เก็บลงฐานข้อมูล
-        save_to_db(filename)
-
-        # ✅ URL รูปภาพ
-        image_url = f"https://wice-transports-1.onrender.com/static/uploads/{filename}"
-
-        # ✅ สร้าง message
-        message = ImageSendMessage(
-            original_content_url=image_url,
-            preview_image_url=image_url
-        )
-
-        results = {}
-
-        # ✅ ส่งหาผู้ใช้
-        for uid in user_ids:
-            try:
-                line_bot_api.push_message(uid, message)
-                print(f"✅ ส่งภาพไปยัง USER {uid} สำเร็จ")
-                results[uid] = True
-            except Exception as e:
-                print(f"❌ ส่งภาพไปยัง USER {uid} ล้มเหลว:", e)
-                results[uid] = False
-
-        # ✅ ส่งหากลุ่ม
-        for gid in group_ids:
-            try:
-                line_bot_api.push_message(gid, message)
-                print(f"✅ ส่งภาพไปยัง GROUP {gid} สำเร็จ")
-                results[gid] = True
-            except Exception as e:
-                print(f"❌ ส่งภาพไปยัง GROUP {gid} ล้มเหลว:", e)
-                results[gid] = False
-
-        return jsonify({'success': True, 'results': results})
-
     except Exception as e:
-        print("❌ Error:", e)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'error': f'Database error: {e}'}), 500
+
+    # สร้างรูปภาพ
+    image_buf = generate_image_table_from_rows(rows, form_type)
+
+    results = {}
+
+    # ส่งให้ผู้ใช้
+    for uid in user_ids:
+        success = send_line_image_push(uid, image_buf)
+        results[uid] = success
+
+    # ส่งให้กลุ่ม
+    for gid in group_ids:
+        success = send_line_image_push(gid, image_buf)
+        results[gid] = success
+
+    return jsonify({'results': results})
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 
@@ -772,6 +714,15 @@ def callback():
             print("👤 USER ID:", user_id)
             save_or_update_user(user_id)
 
+        # elif event_type == 'join' and source.get('type') == 'group':
+        #     group_id = source.get('groupId')
+        #     print("✅ บอทถูกเชิญเข้ากลุ่ม groupId:", group_id)
+
+        #     group_profile = get_group_profile(group_id)
+        #     group_name = group_profile.get('groupName') if group_profile else None
+        #     group_picture = group_profile.get('pictureUrl') if group_profile else None
+
+        #     store_group_id(group_id, group_name, group_picture)
         elif event_type == 'join' and source.get('type') == 'group':
             group_id = source.get('groupId')
             print("✅ บอทถูกเชิญเข้ากลุ่ม groupId:", group_id)
@@ -781,6 +732,7 @@ def callback():
             group_picture = group_profile.get('pictureUrl') if group_profile else None
 
             store_group_id(group_id, group_name, group_picture)
+
 
         elif event_type == 'leave' and source.get('type') == 'group':
             group_id = source.get('groupId')
