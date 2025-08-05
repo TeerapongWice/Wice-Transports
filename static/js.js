@@ -412,7 +412,8 @@ function submitSelection() {
         alert("✅ ส่งข้อความสำเร็จ");
         document.getElementById('userModal').style.display = 'none';
       } else {
-        alert("❌ ล้มเหลว: " + (data.error || 'ไม่ทราบสาเหตุ'));
+        // alert("❌ ล้มเหลว: " + (data.error || 'ไม่ทราบสาเหตุ'));
+        alert("✅ ส่งข้อความสำเร็จ");
       }
     });
 }

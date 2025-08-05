@@ -391,6 +391,17 @@ def save_to_db(filename):
     cursor.close()
     conn.close()
 
+@app.route('/images')
+def show_images():
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM images ORDER BY uploaded_at DESC")
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    return render_template('images.html', rows=rows)
+
 def load_thai_font(size: int = 20, bold: bool = False) -> ImageFont.FreeTypeFont:
     """
     โหลดฟอนต์ไทย Regular หรือ Bold ตามพารามิเตอร์ bold
@@ -497,9 +508,11 @@ def generate_image_table_from_rows(rows, form_type: str, company_logo=None):
     if company_logo:
         resized_logo = company_logo.resize((150, 150))
         img.paste(resized_logo, (10, 10))
+        from zoneinfo import ZoneInfo
 
         # ข้อความทั้งหมด
-        now_str = datetime.now().strftime("%H:%M:%S")
+        # now_str = datetime.now().strftime("%H:%M:%S")
+        now_str = datetime.now(ZoneInfo("Asia/Bangkok")).strftime("%H:%M:%S")
         text_before_time = "อัดเดพสถานะรถล่าสุดเวลา "
         text_time = now_str
 
@@ -844,60 +857,172 @@ def submit():
     except Exception as e:
         print("Error:", e)
         return f'Error: {e}', 500
+# def import_excel():
+#     file = request.files.get('excelFile')
+#     form_type = request.form.get('formType')
+#     if not file:
+#         return jsonify({'success': False, 'error': 'No file uploaded.'}), 400
+
+#     try:
+#         df = pd.read_excel(file)
+
+#         # แปลงวันที่ RecordDate
+#         if 'RecordDate' in df.columns:
+#             # ใช้ errors='coerce' เพื่อให้ค่าที่ไม่ถูกต้องกลายเป็น NaT (Not a Time)
+#             df['RecordDate'] = pd.to_datetime(df['RecordDate'], dayfirst=True, errors='coerce')
+#             # แปลง NaT เป็น None เพื่อให้ psycopg2 จัดการได้
+#             df['RecordDate'] = df['RecordDate'].apply(lambda x: x.date() if pd.notna(x) else None)
+
+#         conn = get_db_connection() # ใช้ฟังก์ชัน get_db_connection ที่เชื่อมต่อกับ PostgreSQL
+#         cursor = conn.cursor()
+
+#         # สร้างรายการคอลัมน์ทั้งหมดที่ Transports มี
+#         # ต้องแน่ใจว่าคอลัมน์ใน DB และใน Excel ตรงกัน หรือปรับให้ตรง
+#         db_columns = [
+#             "Plate", "Name", "Sender", "Customer", "QueueTime", "StartDeliver", "DoneDeliver",
+#             "ConfirmRegis", "TruckLoadIn", "StartLoad", "DoneLoad", "Deliverytime", "Status",
+#             "Deliverytimetocustomer", "DeliveryDate", "PI", "EO", "Containernumber", "Producttype",
+#             "FormType", "RecordDate"
+#         ]
+#         # สร้าง placeholder สำหรับ INSERT
+#         placeholders = ', '.join(['%s'] * len(db_columns))
+#         insert_query = f"INSERT INTO Transports ({', '.join(db_columns)}) VALUES ({placeholders})"
+
+#         for index, row in df.iterrows():
+#             # เตรียมข้อมูลตามลำดับคอลัมน์ของ db_columns
+#             values = []
+#             for col in db_columns:
+#                 if col == 'FormType':
+#                     values.append(form_type)
+#                 elif col == 'RecordDate':
+#                     values.append(row.get(col, None)) # ใช้ None ถ้าไม่มีค่า
+#                 else:
+#                     values.append(str(row.get(col, '')) if pd.notna(row.get(col)) else '') # แปลงเป็น str และจัดการ NaN
+
+#             cursor.execute(insert_query, tuple(values))
+
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+
+#         return jsonify({'success': True})
+#     except Exception as e:
+#         print("Error importing Excel:", e)
+#         return jsonify({'success': False, 'error': str(e)}), 500
+def clean_value(val):
+    if val is None:
+        return ""
+    try:
+        if pd.isna(val):
+            return ""
+    except Exception:
+        pass
+    return val
 
 @app.route('/import_excel', methods=['POST'])
 def import_excel():
-    file = request.files.get('excelFile')
-    form_type = request.form.get('formType')
-    if not file:
-        return jsonify({'success': False, 'error': 'No file uploaded.'}), 400
+    file = request.files["excelFile"]
+    form_type = request.form.get("formType", "Domestic")
 
-    try:
-        df = pd.read_excel(file)
+    df = pd.read_excel(file)
+    df['RecordDate'] = pd.to_datetime(df['RecordDate'], dayfirst=True, errors='coerce')
+    df['RecordDate'] = df['RecordDate'].apply(lambda x: x.date() if pd.notna(x) else None)
 
-        # แปลงวันที่ RecordDate
-        if 'RecordDate' in df.columns:
-            # ใช้ errors='coerce' เพื่อให้ค่าที่ไม่ถูกต้องกลายเป็น NaT (Not a Time)
-            df['RecordDate'] = pd.to_datetime(df['RecordDate'], dayfirst=True, errors='coerce')
-            # แปลง NaT เป็น None เพื่อให้ psycopg2 จัดการได้
-            df['RecordDate'] = df['RecordDate'].apply(lambda x: x.date() if pd.notna(x) else None)
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        conn = get_db_connection() # ใช้ฟังก์ชัน get_db_connection ที่เชื่อมต่อกับ PostgreSQL
-        cursor = conn.cursor()
+    insert_query = """
+        INSERT INTO Transports (
+            Plate, Name, Sender, Customer, QueueTime,
+            StartDeliver, DoneDeliver, ConfirmRegis, TruckLoadIn,
+            StartLoad, DoneLoad, Deliverytime, Status,
+            Deliverytimetocustomer, DeliveryDate, PI, EO,
+            Containernumber, Producttype, RecordDate, FormType
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
 
-        # สร้างรายการคอลัมน์ทั้งหมดที่ Transports มี
-        # ต้องแน่ใจว่าคอลัมน์ใน DB และใน Excel ตรงกัน หรือปรับให้ตรง
-        db_columns = [
-            "Plate", "Name", "Sender", "Customer", "QueueTime", "StartDeliver", "DoneDeliver",
-            "ConfirmRegis", "TruckLoadIn", "StartLoad", "DoneLoad", "Deliverytime", "Status",
-            "Deliverytimetocustomer", "DeliveryDate", "PI", "EO", "Containernumber", "Producttype",
-            "FormType", "RecordDate"
-        ]
-        # สร้าง placeholder สำหรับ INSERT
-        placeholders = ', '.join(['%s'] * len(db_columns))
-        insert_query = f"INSERT INTO Transports ({', '.join(db_columns)}) VALUES ({placeholders})"
+    inserted_count = 0
+    updated_count = 0
 
-        for index, row in df.iterrows():
-            # เตรียมข้อมูลตามลำดับคอลัมน์ของ db_columns
-            values = []
-            for col in db_columns:
-                if col == 'FormType':
-                    values.append(form_type)
-                elif col == 'RecordDate':
-                    values.append(row.get(col, None)) # ใช้ None ถ้าไม่มีค่า
-                else:
-                    values.append(str(row.get(col, '')) if pd.notna(row.get(col)) else '') # แปลงเป็น str และจัดการ NaN
+    for _, row in df.iterrows():
+        plate = row.get("Plate", "")
+        record_date = row.get("RecordDate")
 
-            cursor.execute(insert_query, tuple(values))
+        # เช็คว่ามีข้อมูลนี้อยู่แล้วหรือยัง
+        check_query = "SELECT * FROM Transports WHERE Plate = %s AND RecordDate = %s"
+        cursor.execute(check_query, (plate, record_date))
+        existing = cursor.fetchone()
 
-        conn.commit()
-        cursor.close()
-        conn.close()
+        if existing:
+            # เตรียมข้อมูลสำหรับ update แบบ conditional
+            fields_to_update = []
+            values_to_update = []
 
-        return jsonify({'success': True})
-    except Exception as e:
-        print("Error importing Excel:", e)
-        return jsonify({'success': False, 'error': str(e)}), 500
+            # รายชื่อคอลัมน์ที่ต้องอัพเดท (exclude Plate, RecordDate)
+            columns = [
+                "Name", "Sender", "Customer", "QueueTime", "StartDeliver", "DoneDeliver",
+                "ConfirmRegis", "TruckLoadIn", "StartLoad", "DoneLoad", "Deliverytime",
+                "Status", "Deliverytimetocustomer", "DeliveryDate", "PI", "EO",
+                "Containernumber", "Producttype", "FormType"
+            ]
+
+            for col in columns:
+                val = form_type if col == "FormType" else row.get(col)
+                val = clean_value(val)
+                if val != "":
+                    fields_to_update.append(f"{col} = %s")
+                    values_to_update.append(val)
+
+            if fields_to_update:
+                update_query = f"""
+                    UPDATE Transports SET
+                    {', '.join(fields_to_update)}
+                    WHERE Plate = %s AND RecordDate = %s
+                """
+                values_to_update.extend([plate, record_date])
+                cursor.execute(update_query, values_to_update)
+                updated_count += 1
+            else:
+                # ไม่มีอะไรต้องอัพเดท
+                pass
+
+        else:
+            # INSERT ใหม่
+            insert_values = [
+                clean_value(plate),
+                clean_value(row.get("Name")),
+                clean_value(row.get("Sender")),
+                clean_value(row.get("Customer")),
+                clean_value(row.get("QueueTime")),
+                clean_value(row.get("StartDeliver")),
+                clean_value(row.get("DoneDeliver")),
+                clean_value(row.get("ConfirmRegis")),
+                clean_value(row.get("TruckLoadIn")),
+                clean_value(row.get("StartLoad")),
+                clean_value(row.get("DoneLoad")),
+                clean_value(row.get("Deliverytime")),
+                clean_value(row.get("Status")),
+                clean_value(row.get("Deliverytimetocustomer")),
+                clean_value(row.get("DeliveryDate")),
+                clean_value(row.get("PI")),
+                clean_value(row.get("EO")),
+                clean_value(row.get("Containernumber")),
+                clean_value(row.get("Producttype")),
+                record_date,
+                form_type
+            ]
+            cursor.execute(insert_query, insert_values)
+            inserted_count += 1
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'inserted': inserted_count,
+        'updated': updated_count
+    })
 
 @app.route('/update', methods=['POST'])
 def update():
@@ -1258,26 +1383,26 @@ def draw_header(canvas, doc, form_type):
 
 #     return text + "..."
 
-from reportlab.pdfbase.pdfmetrics import stringWidth
+# from reportlab.pdfbase.pdfmetrics import stringWidth
 
-def truncate_text(text, font_name, font_size, max_width):
-    """ตัดข้อความให้พอดีกับความกว้าง max_width และเติม ... หากเกิน"""
-    if not isinstance(text, str):
-        text = str(text)
+# def truncate_text(text, font_name, font_size, max_width):
+#     """ตัดข้อความให้พอดีกับความกว้าง max_width และเติม ... หากเกิน"""
+#     if not isinstance(text, str):
+#         text = str(text)
 
-    ellipsis = "..."
-    ellipsis_width = stringWidth(ellipsis, font_name, font_size)
+#     ellipsis = "..."
+#     ellipsis_width = stringWidth(ellipsis, font_name, font_size)
 
-    # ปรับลด max_width ลงเล็กน้อยเพื่อให้เผื่อความกว้างของ ...
-    target_width = max_width - ellipsis_width - 2  # ลบเพิ่มอีกนิดเพื่อให้ตัดเร็วขึ้น
+#     # ปรับลด max_width ลงเล็กน้อยเพื่อให้เผื่อความกว้างของ ...
+#     target_width = max_width - ellipsis_width - 2  # ลบเพิ่มอีกนิดเพื่อให้ตัดเร็วขึ้น
 
-    while stringWidth(text, font_name, font_size) > target_width and len(text) > 0:
-        text = text[:-1]
+#     while stringWidth(text, font_name, font_size) > target_width and len(text) > 0:
+#         text = text[:-1]
 
-    if len(text) < len(str(text)):
-        return text + ellipsis
-    else:
-        return text
+#     if len(text) < len(str(text)):
+#         return text + ellipsis
+#     else:
+#         return text
     
 @app.route('/export_pdf', methods=['POST'])
 def export_pdf():
@@ -1302,21 +1427,21 @@ def export_pdf():
         bold_font = "Helvetica-Bold"
 
     col_width_map = {
-        "plate": 12 * mm,
-        "name": 25 * mm,
+        "plate": 10 * mm,
+        "name": 14 * mm,
         "sender": 13 * mm,
-        "customer": 28 * mm,
-        "queuetime": 14 * mm,
-        "startdeliver": 13 * mm,
-        "donedeliver": 16 * mm,
-        "confirmregis": 20 * mm,
-        "truckloadin": 16 * mm,
-        "startload": 15 * mm,
-        "doneload": 16 * mm,
-        "deliverytime": 14 * mm,
+        "customer": 22 * mm,
+        "queuetime": 7 * mm,
+        "startdeliver": 7 * mm,
+        "donedeliver": 7 * mm,
+        "confirmregis": 7 * mm,
+        "truckloadin": 7 * mm,
+        "startload": 7 * mm,
+        "doneload": 7 * mm,
+        "deliverytime": 15.8 * mm,
         "status": 16 * mm,
         "deliverytimetocustomer": 15 * mm,
-        "deliverydate": 14 * mm,
+        "deliverydate": 15.5 * mm,
         "remark": 20 * mm,
         "pi": 14 * mm,
         "eo": 14 * mm,
@@ -1360,26 +1485,50 @@ def export_pdf():
     #     [str(row.get(col.lower(), "")) for col in columns]
     #     for row in table_data
     # ]
-    font_size = 9  # กำหนด font size ที่ใช้
-    data_rows = [
-        [
-            truncate_text(
-                str(row.get(col.lower(), "")),
-                default_font,
-                font_size,
-                col_width_map.get(col.lower(), 25 * mm)
-            )
-            for col in columns
-        ]
-        for row in table_data
-    ]
+    # ตั้งค่ารูปแบบข้อความของ paragraph
+    style = ParagraphStyle(
+        name='Normal',
+        fontName=bold_font,
+        fontSize=9,
+        leading=11,
+        alignment=TA_LEFT,
+    )
 
+    data_rows = []
+    for row in table_data:
+        row_cells = []
+        for col in columns:
+            value = str(row.get(col.lower(), "")).strip()
+            paragraph = Paragraph(value.replace("\n", "<br/>"), style)
+            row_cells.append(paragraph)
+        data_rows.append(row_cells)
+
+        header_style = ParagraphStyle(
+        name='HeaderStyle',
+        fontName=bold_font,
+        fontSize=9,
+        leading=11,
+        alignment=TA_CENTER,
+        textColor=colors.whitesmoke
+    )
+
+    # แปลง headers เป็น Paragraph เพื่อรองรับการตัดบรรทัด
+    headers = [
+        Paragraph(header_thai.get(col.lower(), col).replace(" ", "<br/>"), header_style)
+        for col in columns
+    ]
 
     pdf_table_data = [headers] + data_rows
 
     # ปรับ col_widths ให้ตรงกับ columns ที่ส่งมาและใช้ lowercase
     # col_widths = [col_width_map.get(col.capitalize(), 25 * mm) for col in columns] # .capitalize() เพราะ key ใน map เป็นแบบนั้น
-    col_widths = [col_width_map.get(col.lower(), 25 * mm) for col in columns]
+    # col_widths = [col_width_map.get(col.lower(), 25 * mm) for col in columns]
+    total_width = 270 * mm  # ประมาณความกว้าง usable ของ A4 แนวนอน
+    total_weight = sum([col_width_map.get(col.lower(), 25) for col in columns])
+    col_widths = [
+        (col_width_map.get(col.lower(), 25) / total_weight) * total_width
+        for col in columns
+    ]
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
