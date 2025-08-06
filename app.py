@@ -24,6 +24,8 @@ from linebot.v3.messaging.models import ImageMessage
 from linebot import LineBotApi, WebhookHandler
 from linebot.models import ImageSendMessage
 import base64
+import cloudinary
+import cloudinary.uploader
 
 load_dotenv()
 
@@ -56,9 +58,12 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise Exception("DATABASE_URL environment variable is not set.")
 
-# ✅ พิมพ์เช็คว่าค่าโหลดจาก .env สำเร็จไหม
-# print("✅ Loaded DATABASE_URL:", DATABASE_URL[:30] + "...")
-# print("✅ Loaded LINE_CHANNEL_ACCESS_TOKEN:", LINE_CHANNEL_ACCESS_TOKEN[:10] + "...")
+cloudinary.config(
+  cloud_name="dkcphnfvb",
+  api_key="942215495751482",
+  api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+  secure=True
+)
 
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
@@ -383,7 +388,47 @@ def get_user_ids():
 #     except Exception as e:
 #         print("❌ Error sending LINE message:", e)
 #         return jsonify({'success': False, 'error': str(e)}), 400
-UPLOAD_FOLDER = 'static/uploads'
+def upload_image_to_cloudinary(image_pil):
+    # แปลง PIL image เป็น buffer
+    buf = io.BytesIO()
+    image_pil.save(buf, format="PNG")
+    buf.seek(0)
+
+    try:
+        result = cloudinary.uploader.upload(buf)
+        return result.get("secure_url")
+    except Exception as e:
+        print("❌ Upload ไป Cloudinary ล้มเหลว:", e)
+        return None
+    
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return save_image(UPLOAD_FOLDER, filename)
+
+def send_line_image_push_cloudinary(user_id, image_buf):
+    try:
+        image_buf.seek(0)
+        image_pil = Image.open(image_buf)
+
+        # ✅ อัปโหลดขึ้น Cloudinary
+        image_url = upload_image_to_cloudinary(image_pil)  # ✅ เรียกใช้ของจริง
+        if not image_url:
+            print("❌ ไม่สามารถอัปโหลดภาพไปยัง Cloudinary ได้")
+            return False
+
+        # ✅ ส่ง LINE Message
+        message = ImageSendMessage(
+            original_content_url=image_url,
+            preview_image_url=image_url
+        )
+
+        line_bot_api.push_message(user_id, message)
+        print(f"✅ ส่งภาพผ่าน Cloudinary ไปยัง {user_id} สำเร็จ")
+        return True
+
+    except Exception as e:
+        print(f"❌ ส่งภาพผ่าน Cloudinary ล้มเหลว:", e)
+        return False
 
 def save_image(image_pil, filename=None):
     if not filename:
@@ -593,42 +638,6 @@ def generate_image_table_from_rows(rows, form_type: str, company_logo=None):
     buf.seek(0)
     return buf
 
-# @app.route('/send_line_to_selected', methods=['POST'])
-# def send_line_to_selected():
-#     data = request.json
-
-#     user_ids = data.get('user_ids', [])
-#     group_ids = data.get('group_ids', [])
-#     ids = data.get('ids', [])
-#     form_type = data.get('formType', '').lower()
-
-#     if not user_ids or not ids or not form_type:
-#         return jsonify({'error': 'user_ids, ids or formType missing'}), 400
-
-#     # ดึงข้อมูลจาก DB ตาม ids ที่รับมา
-#     try:
-#         conn = get_db_connection()
-#         cur = conn.cursor(cursor_factory=RealDictCursor)
-#         # แปลง ids เป็น tuple ของ int
-#         ids_int = tuple(map(int, ids))
-#         query = f"SELECT * FROM Transports WHERE id IN %s"
-#         cur.execute(query, (ids_int,))
-#         rows = cur.fetchall()
-#         cur.close()
-#         conn.close()
-#     except Exception as e:
-#         return jsonify({'error': f'Database error: {e}'}), 500
-
-#     # สร้างรูปภาพ
-#     image_buf = generate_image_table_from_rows(rows, form_type)
-
-#     # ส่งรูปภาพไปยัง user_ids แต่ละคน
-#     results = {}
-#     for uid in user_ids:
-#         success = send_line_image_push(uid, image_buf)
-#         results[uid] = success
-
-#     return jsonify({'results': results})
 @app.route('/send_line_to_selected', methods=['POST'])
 def send_line_to_selected():
     data = request.json
@@ -661,12 +670,14 @@ def send_line_to_selected():
 
     # ส่งให้ผู้ใช้
     for uid in user_ids:
-        success = send_line_image_push(uid, image_buf)
+        # success = send_line_image_push(uid, image_buf)
+        success = send_line_image_push_cloudinary(uid, image_buf)
         results[uid] = success
 
     # ส่งให้กลุ่ม
     for gid in group_ids:
-        success = send_line_image_push(gid, image_buf)
+        # success = send_line_image_push(gid, image_buf)
+        success = send_line_image_push_cloudinary(gid, image_buf)
         results[gid] = success
 
     return jsonify({'results': results})
@@ -714,15 +725,6 @@ def callback():
             print("👤 USER ID:", user_id)
             save_or_update_user(user_id)
 
-        # elif event_type == 'join' and source.get('type') == 'group':
-        #     group_id = source.get('groupId')
-        #     print("✅ บอทถูกเชิญเข้ากลุ่ม groupId:", group_id)
-
-        #     group_profile = get_group_profile(group_id)
-        #     group_name = group_profile.get('groupName') if group_profile else None
-        #     group_picture = group_profile.get('pictureUrl') if group_profile else None
-
-        #     store_group_id(group_id, group_name, group_picture)
         elif event_type == 'join' and source.get('type') == 'group':
             group_id = source.get('groupId')
             print("✅ บอทถูกเชิญเข้ากลุ่ม groupId:", group_id)
