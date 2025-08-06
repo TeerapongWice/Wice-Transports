@@ -59,9 +59,9 @@ if not DATABASE_URL:
     raise Exception("DATABASE_URL environment variable is not set.")
 
 cloudinary.config(
-  cloud_name="dkcphnfvb",
-  api_key="942215495751482",
-  api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+  cloud_name = os.environ.get("CLOUDINARY_CLOUD_NAME"),
+  api_key = os.environ.get("CLOUDINARY_API_KEY"),
+  api_secret = os.environ.get("CLOUDINARY_API_SECRET"),
   secure=True
 )
 
