@@ -218,6 +218,24 @@ button {
   /* เขียวเข้มเมื่อ hover */
 }
 
+.save-btn {
+  background-color: #1f8cb1;
+  /* เขียว */
+  color: white;
+  border: none;
+  /* ไม่มีเส้นขอบ */
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.save-btn:hover {
+  background-color: #1c7d9d;
+  /* เขียวเข้มเมื่อ hover */
+}
 .table-section {
   padding: 20px;
   overflow-x: auto;

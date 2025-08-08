@@ -7,10 +7,12 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='/Img/LogoTransport-removebg-preview.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='fontawesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='alert.css') }}">
   <title>WICE Transport Form</title>
 </head>
 
 <body>
+  {% include 'Alert.html' %}
   <header>
     <div class="logo">
       <!-- ถ้าไม่มีโลโก้ลบ img ออกได้ -->
@@ -283,6 +285,7 @@
     </div>
     <button id="btnLineDomestic" onclick="sendLineNotifyByForm('Domestic')" class="submit-btn"
       style="margin: 10px 0;">Update LINE - Domestic</button>
+    <button id="btnSaveDomestic" onclick="saveImages('Domestic')" class="save-btn" style="margin: 10px 0;">Save Images</button>
     <div class="Searchh">
       <h3 id="tableExportHeader">ตาราง Export</h3>
       <div class="SearchExport" style="padding: 5px;">
@@ -354,6 +357,7 @@
     </div>
     <button id="btnLineExport" onclick="sendLineNotifyByForm('Export')" class="submit-btn"
       style="margin: 10px 0;">Update LINE - Export</button>
+    <button id="btnSaveExport" onclick="saveImages('Export')" class="save-btn" style="margin: 10px 0;">Save Images</button>
   </section>
 
   <!-- Modal -->
@@ -380,6 +384,7 @@
   </footer>
   <script src="{{ url_for('static', filename='js.js') }}"></script>
   <script src="{{ url_for('static', filename='xlsx.js') }}"></script>
+  <script src="{{ url_for('static', filename='alert.js') }}"></script>
 </body>
 
 </html>

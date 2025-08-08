@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, jsonify, send_file, redirect, session, url_for
+from flask import Flask, request, render_template, jsonify, send_file, redirect, session, url_for, make_response
 from datetime import datetime
 from flask_cors import CORS
 import pandas as pd
@@ -502,7 +502,7 @@ def generate_image_table_from_rows(rows, form_type: str, company_logo=None):
     headers_domestic = [
         "ทะเบียน", "ชื่อ", "ผู้ขนส่ง", "ลูกค้า",
         "Delivery Date", "เริ่มโหลด", "โหลดเสร็จ",
-        "เวลาส่ง", "Status", "ถึงลูกค้า", "หมายเหตุ"
+        "เวลาส่งสินค้า", "Status", "เวลาส่งถึงลูกค้า", "หมายเหตุ"
     ]
 
     headers_export = [
@@ -637,6 +637,25 @@ def generate_image_table_from_rows(rows, form_type: str, company_logo=None):
     img.save(buf, format="PNG")
     buf.seek(0)
     return buf
+
+@app.route("/download-image", methods=["POST"])
+def download_image():
+    data = request.get_json()
+    form_type = data.get("form_type", "domestic")
+    rows = data.get("rows", [])
+
+    # สร้างชื่อไฟล์ที่มี timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{form_type}_transport_status_{timestamp}.png"
+
+    # สร้างภาพจากข้อมูล
+    image_buf = generate_image_table_from_rows(rows, form_type)
+
+    # สร้าง response พร้อม header ระบุชื่อไฟล์
+    response = make_response(image_buf.getvalue())
+    response.headers.set('Content-Type', 'image/png')
+    response.headers.set('Content-Disposition', f'attachment; filename="{filename}"')
+    return response
 
 @app.route('/send_line_to_selected', methods=['POST'])
 def send_line_to_selected():

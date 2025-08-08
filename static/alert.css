@@ -1,0 +1,55 @@
+.confirm-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none; /* ⛔️ default: ไม่รับ mouse events */
+    transition: opacity 0.3s, visibility 0.3s;
+    z-index: 10000;
+}
+
+.confirm-container.show {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto; /* ✅ เมื่อแสดง alert ค่อยรับ mouse event */
+}
+
+/* กล่อง Alert */
+.alert-box {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    width: 300px;
+}
+
+/* ปุ่ม */
+.btn-y {
+    width: 65px;
+    margin-top: 10px;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: none;
+}
+
+.btn-primary {background: #3085d6; color: white; }
+.btn-primary:hover { background: #256abf; box-shadow: none; }
+
+.btn-dangerD {background: #dc3545; color: white; }
+.btn-dangerD:hover { background: #c82333; box-shadow: none; }
+
+.btn-cancel {background: #b8b3b4; color: white; }
+.btn-cancel:hover { background: #9a9697; box-shadow: none; }
+/* แสดง Alert */
+.show { visibility: visible; opacity: 1; }

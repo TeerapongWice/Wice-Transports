@@ -25,6 +25,9 @@ function toggleForm(formName) {
   const btnLineDomestic = document.getElementById('btnLineDomestic');
   const btnLineExport = document.getElementById('btnLineExport');
 
+  const btnSaveDomestic = document.getElementById('btnSaveDomestic');
+  const btnSaveExport = document.getElementById('btnSaveExport');
+
   const SearchDomestic = document.querySelector('.SearchDomestic');
   const SearchExport = document.querySelector('.SearchExport');
 
@@ -39,6 +42,8 @@ function toggleForm(formName) {
     hDomestic.style.display = 'block';
     btnLineDomestic.style.display = 'inline-block';   // ✅ แสดงปุ่ม
     btnLineExport.style.display = 'none';             // ✅ ซ่อนอีกปุ่ม
+    btnSaveDomestic.style.display = 'inline-block';
+    btnSaveExport.style.display = 'none';
 
     tableExport.style.display = 'none';
     hExport.style.display = 'none';
@@ -55,6 +60,8 @@ function toggleForm(formName) {
     hDomestic.style.display = 'none';
     btnLineDomestic.style.display = 'none';
     btnLineExport.style.display = 'inline-block';
+    btnSaveDomestic.style.display = 'none';
+    btnSaveExport.style.display = 'inline-block';
 
     tableExport.style.display = 'table';
     hExport.style.display = 'block';
@@ -97,11 +104,13 @@ document.getElementById('transportForm').addEventListener('submit', function (e)
     body: formData
   }).then(resp => {
     if (resp.ok) {
-      alert('บันทึกข้อมูล Domestic เรียบร้อย');
+      // alert('บันทึกข้อมูล Domestic เรียบร้อย');
+      document.getElementById("senderDomestic").classList.add("show");
       this.reset();
       location.reload();
     } else {
-      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      // alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      document.getElementById("ErrorData").classList.add("show");
     }
   });
 });
@@ -114,11 +123,13 @@ document.getElementById('exportFormData').addEventListener('submit', function (e
     body: formData
   }).then(resp => {
     if (resp.ok) {
-      alert('บันทึกข้อมูล Export เรียบร้อย');
+      // alert('บันทึกข้อมูล Export เรียบร้อย');
+      document.getElementById("senderExport").classList.add("show");
       this.reset();
       location.reload();
     } else {
-      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      // alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      document.getElementById("ErrorData").classList.add("show");
     }
   });
 });
@@ -138,46 +149,25 @@ function toggleEditSave(btn) {
     let data = { id };
 
     if (formType === 'Domestic') {
-      // data = {
-      //   id,
-      //   plate: inputs[0].value,
-      //   name: inputs[1].value,
-      //   sender: inputs[2].value,
-      //   customer: inputs[3].value,
-      //   arrivalTime: inputs[4].value,
-      //   startUnload: inputs[5].value,
-      //   endUnload: inputs[6].value,
-      //   regReceive: inputs[7].value,
-      //   truckUnload: inputs[8].value,
-      //   startLoad: inputs[9].value,
-      //   endLoad: inputs[10].value,
-      //   Deliverytime: inputs[11].value,
-      //   Status: inputs[12].value,
-      //   Deliverytimetocustomer: inputs[13].value,
-      //   DeliveryDate: inputs[14].value,
-      //   remark: inputs[15].value,
-      // };
-
-      // เปลี่ยนจาก regReceive เป็น confirmregis
-    data = {
-      id,
-      plate: inputs[0].value,
-      name: inputs[1].value,
-      sender: inputs[2].value,
-      customer: inputs[3].value,
-      arrivalTime: inputs[4].value,
-      startUnload: inputs[5].value,
-      endUnload: inputs[6].value,
-      confirmregis: inputs[7].value,  // <-- แก้ตรงนี้
-      truckUnload: inputs[8].value,
-      startLoad: inputs[9].value,
-      endLoad: inputs[10].value,
-      Deliverytime: inputs[11].value,
-      Status: inputs[12].value,
-      Deliverytimetocustomer: inputs[13].value,
-      DeliveryDate: inputs[14].value,
-      remark: inputs[15].value,
-    };
+      data = {
+        id,
+        plate: inputs[0].value,
+        name: inputs[1].value,
+        sender: inputs[2].value,
+        customer: inputs[3].value,
+        arrivalTime: inputs[4].value,
+        startUnload: inputs[5].value,
+        endUnload: inputs[6].value,
+        confirmregis: inputs[7].value,
+        truckUnload: inputs[8].value,
+        startLoad: inputs[9].value,
+        endLoad: inputs[10].value,
+        Deliverytime: inputs[11].value,
+        Status: inputs[12].value,
+        Deliverytimetocustomer: inputs[13].value,
+        DeliveryDate: inputs[14].value,
+        remark: inputs[15].value,
+      };
 
     } else if (formType === 'Export') {
       data = {
@@ -207,114 +197,93 @@ function toggleEditSave(btn) {
       body: JSON.stringify(data)
     }).then(response => {
       if (response.ok) {
-        alert("อัปเดตสำเร็จ");
+        // alert("อัปเดตสำเร็จ");
+        document.getElementById("UpadteData").classList.add("show");
         inputs.forEach(input => input.disabled = true);
         btn.textContent = "Edit";
         btn.classList.remove('btn-save');
         btn.classList.add('btn-edit');
       } else {
-        alert("เกิดข้อผิดพลาด");
+        // alert("เกิดข้อผิดพลาด");
+        document.getElementById("Error").classList.add("show");
       }
     });
   }
 }
 
-function deleteRow(btn) {
-  const row = btn.closest("tr");
-  const id = row.dataset.id;
-
-  if (confirm("คุณต้องการลบแถวนี้จริงหรือไม่?")) {
-    fetch('/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: id })
-    }).then(response => {
-      if (response.ok) {
-        alert("ลบสำเร็จ");
-        row.remove(); // ลบแถวออกจาก DOM
-      } else {
-        alert("เกิดข้อผิดพลาดในการลบ");
-      }
-    });
-  }
-}
-
-// function toggleEditSave(btn) {
+// function deleteRow(btn) {
 //   const row = btn.closest("tr");
-//   const inputs = row.querySelectorAll("input[type='text']");
-//   const formType = row.dataset.formtype;
+//   const id = row.dataset.id;
 
-//   if (btn.textContent === "Edit") {
-//     // เปลี่ยน input ให้แก้ไขได้
-//     inputs.forEach(input => input.disabled = false);
-//     btn.textContent = "Save";
-//     btn.classList.remove('btn-edit');
-//     btn.classList.add('btn-save');
-//   } else {
-//     // กด Save จะเก็บข้อมูลจาก input ตามลำดับจริง
-//     const id = row.dataset.id;
-//     let data = { id };
-
-//     if (formType === 'Domestic') {
-//       data = {
-//         id,
-//         plate: inputs[0].value,               // 1. ทะเบียน
-//         name: inputs[1].value,                // 2. ชื่อ
-//         sender: inputs[2].value,              // 3. ผู้ขนส่ง
-//         customer: inputs[3].value,            // 4. ลูกค้า
-//         arrivalTime: inputs[4].value,         // 5. เวลาที่รถลงคิว (QueueTime)
-//         startUnload: inputs[5].value,         // 6. เริ่มตั้งสินค้า (StartDeliver)
-//         endUnload: inputs[6].value,           // 7. ตั้งสินค้าสำเร็จ (DoneDeliver)
-//         regReceive: inputs[7].value,          // 8. ขนส่งตอบรับทะเบียน (ConfirmRegis)
-//         truckUnload: inputs[8].value,         // 9. รถเข้าโหลดสินค้า (TruckLoadIn)
-//         startLoad: inputs[9].value,           // 10. เริ่มโหลดสินค้า (StartLoad)
-//         endLoad: inputs[10].value,            // 11. โหลดสินค้าสำเร็จ (DoneLoad)
-//         Deliverytime: inputs[11].value,       // 12. เวลาส่งสินค้า (Deliverytime)
-//         Status: inputs[12].value,             // 13. Status
-//         Deliverytimetocustomer: inputs[13].value,  // 14. เวลาส่งถึงลูกค้า
-//         DeliveryDate: inputs[14].value,       // 15. Delivery Date
-//         remark: inputs[15].value               // 16. หมายเหตุ
-//       };
-//     } else if (formType === 'Export') {
-//       data = {
-//         id,
-//         plate: inputs[3].value,
-//         name: inputs[4].value,
-//         sender: inputs[5].value,
-//         customer: inputs[6].value,
-//         arrivalTime: inputs[8].value,
-//         startUnload: inputs[9].value,
-//         endUnload: inputs[10].value,
-//         truckUnload: inputs[11].value,
-//         startLoad: inputs[12].value,
-//         endLoad: inputs[13].value,
-//         Pi: inputs[0].value,
-//         Eo: inputs[1].value,
-//         Container_number: inputs[2].value,
-//         Product_type: inputs[7].value,
-//         remark: inputs[14].value,
-//         formtype: formType,
-//       };
-//     }
-
-//     // ส่งข้อมูลไปยัง backend
-//     fetch('/update', {
+//   if (confirm("คุณต้องการลบแถวนี้จริงหรือไม่?")) {
+//     fetch('/delete', {
 //       method: 'POST',
 //       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify(data)
+//       body: JSON.stringify({ id: id })
 //     }).then(response => {
 //       if (response.ok) {
-//         alert("อัปเดตสำเร็จ");
-//         inputs.forEach(input => input.disabled = true);
-//         btn.textContent = "Edit";
-//         btn.classList.remove('btn-save');
-//         btn.classList.add('btn-edit');
+//         // alert("ลบสำเร็จ");
+//         document.getElementById("DeteleData").classList.add("show");
+//         row.remove(); // ลบแถวออกจาก DOM
 //       } else {
-//         alert("เกิดข้อผิดพลาด");
+//         // alert("เกิดข้อผิดพลาดในการลบ");
+//         document.getElementById("DeleteError").classList.add("show");
 //       }
 //     });
 //   }
 // }
+function deleteRow(btn) {
+  const row = btn.closest("tr");
+  const id = row.dataset.id;
+
+  // แสดง modal confirm
+  const modal = document.getElementById('deleteConfirmModal');
+  modal.classList.add('show');
+
+  // กดปุ่ม "ลบ"
+  const confirmBtn = document.getElementById('confirmDeleteBtn');
+  const cancelBtn = document.getElementById('cancelDeleteBtn');
+
+  // กำหนด event handler สำหรับปุ่มลบ
+  function onConfirm() {
+    fetch('/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id })
+    })
+    .then(response => {
+      if (response.ok) {
+        document.getElementById("DeteleData").classList.add("show");
+        row.remove();
+      } else {
+        document.getElementById("DeleteError").classList.add("show");
+      }
+    })
+    .catch(error => {
+      console.error('Delete error:', error);
+      document.getElementById("DeleteError").classList.add("show");
+    })
+    .finally(() => {
+      modal.classList.remove('show');
+      cleanup();
+    });
+  }
+
+  // กดปุ่ม "ยกเลิก"
+  function onCancel() {
+    modal.classList.remove('show');
+    cleanup();
+  }
+
+  // เคลียร์ event listener หลังใช้งาน
+  function cleanup() {
+    confirmBtn.removeEventListener('click', onConfirm);
+    cancelBtn.removeEventListener('click', onCancel);
+  }
+
+  confirmBtn.addEventListener('click', onConfirm);
+  cancelBtn.addEventListener('click', onCancel);
+}
 
 let selectedRowIds = [];
 let currentFormType = '';
@@ -333,11 +302,90 @@ function sendLineNotifyByForm(formType) {
   });
 
   if (selectedRowIds.length === 0) {
-    alert("กรุณาเลือกข้อมูลก่อนส่ง LINE");
+    // alert("กรุณาเลือกข้อมูลก่อนส่ง LINE");
+    document.getElementById("SelectLine").classList.add("show");
     return;
   }
   openUserGroupModal();  // ✅ เปิด modal
 
+}
+
+function saveImages(formType) {
+  const tableId = formType === 'Domestic' ? 'domesticTable' : 'exportTable';
+  const checkboxes = document.querySelectorAll(`#${tableId} .row-checkbox`);
+  const selectedRows = [];
+
+  const columnKeys = formType === 'Domestic' ? [
+    "plate", "name", "sender", "customer", "queuetime", "startdeliver", "donedeliver",
+    "confirmregis", "truckloadin", "startload", "doneload", "deliverytime",
+    "status", "deliverytimetocustomer", "deliverydate", "remark"
+  ] : [
+    "pi", "eo", "containernumber", "plate", "name", "sender", "customer",
+    "producttype", "queuetime", "startdeliver", "donedeliver", "truckloadin",
+    "startload", "doneload", "remark"
+  ];
+
+  checkboxes.forEach(cb => {
+    if (cb.checked) {
+      const row = cb.closest('tr');
+      const rowData = {};
+      const tdList = row.querySelectorAll('td');
+
+      // index 0 คือ checkbox
+      for (let i = 1; i <= columnKeys.length; i++) {
+        const key = columnKeys[i - 1];
+        const input = tdList[i].querySelector('input');
+        rowData[key] = input ? input.value.trim() : '';
+      }
+
+      selectedRows.push(rowData);
+    }
+  });
+
+  if (selectedRows.length === 0) {
+    // alert("กรุณาเลือกข้อมูลก่อนดาวน์โหลดภาพ");
+    document.getElementById("successClose").classList.add("show");
+    return;
+  }
+
+  fetch("/download-image", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      form_type: formType.toLowerCase(),
+      rows: selectedRows
+    })
+  })
+    .then(response => {
+      if (!response.ok) throw new Error("เกิดข้อผิดพลาดในการดาวน์โหลดภาพ");
+
+      // อ่านชื่อไฟล์จาก header
+      const disposition = response.headers.get("Content-Disposition");
+      let filename = `${formType}_transport_status.png`;
+      if (disposition && disposition.indexOf("filename=") !== -1) {
+        const match = disposition.match(/filename="?(.+?)"?$/);
+        if (match) {
+          filename = match[1];
+        }
+      }
+
+      return response.blob().then(blob => ({ blob, filename }));
+    })
+    .then(({ blob, filename }) => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    })
+    .catch(error => {
+      alert("ไม่สามารถดาวน์โหลดภาพได้: " + error.message);
+    });
 }
 
 function closeUserModal() {
@@ -392,7 +440,8 @@ function submitSelection() {
   const selectedGroups = Array.from(document.querySelectorAll('input[name="group_ids"]:checked')).map(e => e.value);
 
   if (selectedUsers.length === 0 && selectedGroups.length === 0) {
-    alert("กรุณาเลือกอย่างน้อย 1 รายการ (ผู้ใช้หรือกลุ่ม)");
+    // alert("กรุณาเลือกอย่างน้อย 1 รายการ (ผู้ใช้หรือกลุ่ม)");
+    document.getElementById("SelectLineUsers").classList.add("show");
     return;
   }
 
@@ -409,11 +458,13 @@ function submitSelection() {
     .then(res => res.json())
     .then(data => {
       if (data.success) {
-        alert("✅ ส่งข้อความสำเร็จ");
+        // alert("✅ ส่งข้อความสำเร็จ");
+        document.getElementById("SendLine").classList.add("show");
         document.getElementById('userModal').style.display = 'none';
       } else {
         // alert("❌ ล้มเหลว: " + (data.error || 'ไม่ทราบสาเหตุ'));
-        alert("✅ ส่งข้อความสำเร็จ");
+        // alert("✅ ส่งข้อความสำเร็จ");
+        document.getElementById("SendLine").classList.add("show");
       }
     });
 }
@@ -481,7 +532,8 @@ function searchTable(inputId, tableId, tbodyId) {
     })
     .catch(err => {
       console.error('Search error:', err);
-      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      // alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      document.getElementById("ServerError").classList.add("show");
     });
 }
 
@@ -780,7 +832,8 @@ function importExcel(type) {
   const file = fileInput.files[0];
 
   if (!file) {
-    alert("กรุณาเลือกไฟล์ Excel");
+    // alert("กรุณาเลือกไฟล์ Excel");
+    document.getElementById("importExcel").classList.add("show");
     return;
   }
 
@@ -795,7 +848,9 @@ function importExcel(type) {
     .then(res => res.json())
     .then(data => {
       if (data.success) {
-        alert("นำเข้าข้อมูล " + type + " สำเร็จ");
+        // alert("นำเข้าข้อมูล " + type + " สำเร็จ");
+        document.getElementById("alertSuccessType").innerText = type;
+        document.getElementById("importExcelSuccess").classList.add("show");
       } else {
         alert("เกิดข้อผิดพลาด: " + data.error);
       }
@@ -821,7 +876,8 @@ function addMasterTransport(triggerEl) {
     .then(res => res.json())
     .then(result => {
       if (result.success) {
-        alert("เพิ่มผู้ขนส่งเรียบร้อย");
+        // alert("เพิ่มผู้ขนส่งเรียบร้อย");
+        document.getElementById("SendSuccess").classList.add("show");
 
         const span = document.createElement('span');
         span.className = 'option-text';
@@ -843,12 +899,14 @@ function addMasterTransport(triggerEl) {
         container.querySelector('.new-item-input').value = '';
         container.querySelector('.add-section').style.display = 'none';
       } else {
-        alert("เพิ่มผู้ขนส่งล้มเหลว: " + result.error);
+        // alert("เพิ่มผู้ขนส่งล้มเหลว: " + result.error);
+        document.getElementById("SendError").classList.add("show");
       }
     })
     .catch(err => {
       console.error(err);
-      alert("เกิดข้อผิดพลาดในการเพิ่มผู้ขนส่ง");
+      // alert("เกิดข้อผิดพลาดในการเพิ่มผู้ขนส่ง");
+      document.getElementById("SendError").classList.add("show");
     });
 }
 
@@ -895,25 +953,62 @@ function loadTransportOptions() {
 }
 
 // ลบผู้ขนส่ง
-function deleteTransport(transportName, container) {
-  if (!confirm(`คุณต้องการลบ "${transportName}" ใช่หรือไม่?`)) return;
+// function deleteTransport(transportName, container) {
+//   if (!confirm(`คุณต้องการลบ "${transportName}" ใช่หรือไม่?`)) return;
 
-  fetch(`/api/masterTransports/${encodeURIComponent(transportName)}`, {
+//   fetch(`/api/masterTransports/${encodeURIComponent(transportName)}`, {
+//     method: 'DELETE'
+//   })
+//     .then(response => response.json())
+//     .then(result => {
+//       if (result.success) {
+//         alert(`ลบผู้ขนส่ง "${transportName}" เรียบร้อย`);
+//         loadTransportOptions();
+//       } else {
+//         alert('เกิดข้อผิดพลาด: ' + result.error);
+//       }
+//     })
+//     .catch(error => {
+//       console.error('Delete transport error:', error);
+//     });
+// }
+let transportToDelete = '';
+
+function deleteTransport(transportName, container) {
+  transportToDelete = transportName;
+
+  // แสดงชื่อใน modal confirm
+  document.getElementById("deleteName").innerText = transportName;
+
+  // แสดง modal confirm
+  document.getElementById("deleteConfirm").classList.add("show");
+}
+
+function confirmDeleteTransport() {
+  fetch(`/api/masterTransports/${encodeURIComponent(transportToDelete)}`, {
     method: 'DELETE'
   })
-    .then(response => response.json())
-    .then(result => {
-      if (result.success) {
-        alert(`ลบผู้ขนส่ง "${transportName}" เรียบร้อย`);
-        loadTransportOptions();
-      } else {
-        alert('เกิดข้อผิดพลาด: ' + result.error);
-      }
-    })
-    .catch(error => {
-      console.error('Delete transport error:', error);
-    });
+  .then(response => response.json())
+  .then(result => {
+    if (result.success) {
+      closeAlert(); // ซ่อน modal confirm
+
+      // แสดง modal success พร้อมชื่อที่ลบ
+      document.getElementById("DeleteTransportSuccess").innerText = ` ${transportToDelete} `;
+      document.getElementById("SendDeleteSuccess").classList.add("show");
+
+      // โหลดข้อมูลผู้ขนส่งใหม่
+      loadTransportOptions();
+    } else {
+      alert('เกิดข้อผิดพลาด: ' + result.error);
+    }
+  })
+  .catch(error => {
+    console.error('Delete transport error:', error);
+    closeAlert();
+  });
 }
+
 
 // เปิด-ปิด dropdown ผู้ขนส่ง
 function toggleSenderDropdown(container) {
@@ -988,7 +1083,8 @@ function addMasterCustomer(triggerEl) {
     .then(res => res.json())
     .then(result => {
       if (result.success) {
-        alert("เพิ่มลูกค้าเรียบร้อย");
+        // alert("เพิ่มลูกค้าเรียบร้อย");
+        document.getElementById("CustomerSuccess").classList.add("show");
 
         const span = document.createElement('span');
         span.className = 'option-text';
@@ -1010,12 +1106,14 @@ function addMasterCustomer(triggerEl) {
         container.querySelector('.new-item-input').value = '';
         container.querySelector('.add-section').style.display = 'none';
       } else {
-        alert("เพิ่มลูกค้าล้มเหลว: " + result.error);
+        // alert("เพิ่มลูกค้าล้มเหลว: " + result.error);
+        document.getElementById("CustomerError").classList.add("show");
       }
     })
     .catch(err => {
       console.error(err);
-      alert("เกิดข้อผิดพลาดในการเพิ่มลูกค้า");
+      // alert("เกิดข้อผิดพลาดในการเพิ่มลูกค้า");
+      document.getElementById("CustomerError").classList.add("show");
     });
 }
 
@@ -1061,25 +1159,61 @@ function loadCustomerOptions() {
   });
 }
 
-// ลบลูกค้า
-function deleteCustomer(customerName, container) {
-  if (!confirm(`คุณต้องการลบลูกค้า "${customerName}" ใช่หรือไม่?`)) return;
+// // ลบลูกค้า
+// function deleteCustomer(customerName, container) {
+//   if (!confirm(`คุณต้องการลบลูกค้า "${customerName}" ใช่หรือไม่?`)) return;
 
-  fetch(`/api/customers/${encodeURIComponent(customerName)}`, {
+//   fetch(`/api/customers/${encodeURIComponent(customerName)}`, {
+//     method: 'DELETE'
+//   })
+//     .then(response => response.json())
+//     .then(result => {
+//       if (result.success) {
+//         alert(`ลบลูกค้า "${customerName}" เรียบร้อย`);
+//         loadCustomerOptions();
+//       } else {
+//         alert('เกิดข้อผิดพลาด: ' + result.error);
+//       }
+//     })
+//     .catch(error => {
+//       console.error('Delete customer error:', error);
+//     });
+// }
+let customerToDelete = '';
+
+function deleteCustomer(customerName, container) {
+  // เก็บชื่อลูกค้าที่จะลบ
+  customerToDelete = customerName;
+
+  // แสดงชื่อลูกค้าใน modal confirm
+  document.getElementById("deleteNameCustomer").innerText = customerName;
+
+  // แสดง modal confirm
+  document.getElementById("deleteConfirmCustomer").classList.add("show");
+}
+
+function confirmDeleteCustomer() {
+  fetch(`/api/customers/${encodeURIComponent(customerToDelete)}`, {
     method: 'DELETE'
   })
-    .then(response => response.json())
-    .then(result => {
-      if (result.success) {
-        alert(`ลบลูกค้า "${customerName}" เรียบร้อย`);
-        loadCustomerOptions();
-      } else {
-        alert('เกิดข้อผิดพลาด: ' + result.error);
-      }
-    })
-    .catch(error => {
-      console.error('Delete customer error:', error);
-    });
+  .then(response => response.json())
+  .then(result => {
+    if (result.success) {
+      closeAlert(); // ซ่อน modal confirm
+
+      // แสดง modal success พร้อมชื่อที่ลบ
+      document.getElementById("DeleteCustomerSuccess").innerText = ` ${customerToDelete} `;
+      document.getElementById("CustomerDeleteSuccess").classList.add("show");
+
+      loadCustomerOptions(); // โหลดข้อมูลลูกค้าใหม่
+    } else {
+      alert('เกิดข้อผิดพลาด: ' + result.error);
+    }
+  })
+  .catch(error => {
+    console.error('Delete customer error:', error);
+    closeAlert();
+  });
 }
 
 // เปิด-ปิด dropdown ลูกค้า
@@ -1138,7 +1272,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function exportDataArrayToExcel(dataArray, filename, formType) {
   if (!dataArray || dataArray.length === 0) {
-    alert("ไม่มีข้อมูลให้ Export");
+    // alert("ไม่มีข้อมูลให้ Export");
+    document.getElementById("ExcelError").classList.add("show");
     return;
   }
 
@@ -1182,7 +1317,8 @@ document.getElementById("ExcelExport").addEventListener("click", function () {
 
 function exportDataArrayToPDF(dataArray, formType) {
   if (!dataArray || dataArray.length === 0) {
-    alert("ไม่มีข้อมูลให้ Export");
+    // alert("ไม่มีข้อมูลให้ Export");
+    document.getElementById("ExcelError").classList.add("show");
     return;
   }
 

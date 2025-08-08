@@ -1,0 +1,184 @@
+<!-- close Alert -->
+<div id="successClose" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/warning.png') }}" alt="warning" style="width:55px; height:55px;">
+        <p>กรุณาเลือกข้อมูลก่อนดาวน์โหลดภาพ!</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="senderDomestic" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+        <p>บันทึกข้อมูล Domestic เรียบร้อย</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="senderExport" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+        <p>บันทึกข้อมูล Export เรียบร้อย</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="ErrorData" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/cross.png') }}" alt="cross" style="width:55px; height:55px;">
+        <p>เกิดข้อผิดพลาดในการบันทึกข้อมูล</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="UpadteData" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+        <p>อัปเดตข้อมูลเรียบร้อย</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="Error" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/cross.png') }}" alt="cross" style="width:55px; height:55px;">
+        <p>เกิดข้อผิดพลาด</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="DeteleData" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+        <p>ลบข้อมูลเรียบร้อย</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="DeleteError" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/cross.png') }}" alt="cross" style="width:55px; height:55px;">
+        <p>เกิดข้อผิดพลาดในการลบ</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="SelectLine" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/warning.png') }}" alt="warning" style="width:55px; height:55px;">
+        <p>กรุณาเลือกข้อมูลก่อนส่ง LINE!</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="SelectLineUsers" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/warning.png') }}" alt="warning" style="width:55px; height:55px;">
+        <p>กรุณาเลือกอย่างน้อย 1 รายการ!</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="SendLine" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+        <p>ส่งข้อความสำเร็จเรียบร้อย</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="ServerError" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/cross.png') }}" alt="cross" style="width:55px; height:55px;">
+        <p>เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="importExcel" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/warning.png') }}" alt="warning" style="width:55px; height:55px;">
+        <p>กรุณาเลือกไฟล์ Excel!</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="importExcelSuccess" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+        <p>นำเข้าข้อมูล <span id="alertSuccessType"></span> สำเร็จ</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="SendSuccess" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+        <p>เพิ่มข้อมูลผู้ขนส่งเรียบร้อย</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="SendError" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/cross.png') }}" alt="cross" style="width:55px; height:55px;">
+        <p>เกิดข้อผิดพลาดในการเพิ่มข้อมูลผู้ขนส่ง</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+
+<!-- Confirm ลบผู้ขนส่ง -->
+<div id="deleteConfirm" class="confirm-container">
+  <div class="alert-box">
+    <img src="{{ url_for('static', filename='Img/warning.png') }}" alt="warning" style="width:55px; height:55px;">
+    <p>คุณต้องการลบ <span id="deleteName"></span> ใช่หรือไม่?</p>
+    <button class="btn-y btn-dangerD" onclick="confirmDeleteTransport()">ลบ</button>
+    <button class="btn-y btn-cancel" onclick="closeAlert()">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- Alert ลบผู้ขนส่งสำเร็จ --> 
+<div id="SendDeleteSuccess" class="confirm-container">
+  <div class="alert-box">
+    <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+    <p>ลบผู้ขนส่ง<span id="DeleteTransportSuccess"></span>เรียบร้อย</p>
+    <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+  </div>
+</div>
+
+<div id="CustomerSuccess" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+        <p>เพิ่มข้อมูลลูกค้าเรียบร้อย</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+<div id="CustomerError" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/cross.png') }}" alt="cross" style="width:55px; height:55px;">
+        <p>เกิดข้อผิดพลาดในการเพิ่มข้อมูลลูกค้า</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
+
+<!-- Confirm ลบลูกค้า -->
+<div id="deleteConfirmCustomer" class="confirm-container">
+  <div class="alert-box">
+    <img src="{{ url_for('static', filename='Img/warning.png') }}" alt="warning" style="width:55px; height:55px;">
+    <p>คุณต้องการลบลูกค้า <span id="deleteNameCustomer"></span> ใช่หรือไม่?</p>
+    <button class="btn-y btn-dangerD" onclick="confirmDeleteCustomer()">ลบ</button>
+    <button class="btn-y btn-cancel" onclick="closeAlert()">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- Alert ลบลูกค้าสำเร็จ --> 
+<div id="CustomerDeleteSuccess" class="confirm-container">
+  <div class="alert-box">
+    <img src="{{ url_for('static', filename='Img/accept.png') }}" alt="accept" style="width:55px; height:55px;">
+    <p>ลบลูกค้า <span id="DeleteCustomerSuccess"></span> เรียบร้อย</p>
+    <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+  </div>
+</div>
+
+<!-- Modal Confirm ลบ -->
+<div id="deleteConfirmModal" class="confirm-container">
+  <div class="alert-box">
+    <img src="{{ url_for('static', filename='Img/warning.png') }}" alt="warning" style="width:55px; height:55px;">
+    <p>คุณต้องการลบแถวนี้จริงหรือไม่?</p>
+    <button class="btn-y btn-dangerD" id="confirmDeleteBtn">ลบ</button>
+    <button class="btn-y btn-cancel" id="cancelDeleteBtn">ยกเลิก</button>
+  </div>
+</div>
+
+<div id="ExcelError" class="confirm-container">
+    <div class="alert-box">
+        <img src="{{ url_for('static', filename='Img/cross.png') }}" alt="cross" style="width:55px; height:55px;">
+        <p>ไม่มีข้อมูลให้ Export</p>
+        <button class="btn-y btn-primary" onclick="closeAlert()">ตกลง</button>
+    </div>
+</div>
