@@ -26,6 +26,7 @@ from linebot.models import ImageSendMessage
 import base64
 import cloudinary
 import cloudinary.uploader
+from email.utils import parsedate_to_datetime
 
 load_dotenv()
 
@@ -1402,18 +1403,34 @@ def export_excel():
         return "❌ FormType ต้องเป็น 'Domestic' หรือ 'Export'", 400
 
     # จัดการ RecordDate ให้เป็นรูปแบบวันที่ที่ต้องการ ถ้าเป็น datetime object
+    # for col in ["RecordDate", "DeliveryDate"]:
+    #     if col in df.columns:
+    #         df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) and isinstance(x, (datetime, pd.Timestamp)) else x)
     for col in ["RecordDate", "DeliveryDate"]:
         if col in df.columns:
-            df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) and isinstance(x, (datetime, pd.Timestamp)) else x)
-
+            def parse_and_format_date(x):
+                if pd.isna(x):
+                    return ""
+                if isinstance(x, (datetime, pd.Timestamp)):
+                    return x.strftime('%d/%m/%Y')
+                if isinstance(x, str):
+                    try:
+                        dt = parsedate_to_datetime(x)
+                        return dt.strftime('%d/%m/%Y')
+                    except Exception:
+                        return x
+                return x
+            df[col] = df[col].apply(parse_and_format_date)
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name=f"{form_type.capitalize()} Report")
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
     output.seek(0)
     return send_file(output,
-                     download_name=f"{form_type.capitalize()}_Transport_Report.xlsx",
+                     download_name=f"{form_type.capitalize()}_Transport_Report_{timestamp}.xlsx",
                      as_attachment=True,
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
@@ -1519,6 +1536,7 @@ def export_pdf():
         bold_font = "Helvetica-Bold"
 
     col_width_map = {
+        "recorddate" :10 * mm,
         "plate": 10 * mm,
         "name": 14 * mm,
         "sender": 13 * mm,
@@ -1545,6 +1563,7 @@ def export_pdf():
     # กำหนดชื่อหัวตารางเป็นภาษาไทย (ต้อง match จำนวนคอลัมน์ที่เลือก)
     # ใช้ key เป็น lowercase ตามที่ RealDictCursor คืนค่ามา
     header_thai = {
+        "recorddate": "Date",
         "plate": "ทะเบียน",
         "name": "ชื่อพนักงานขับ",
         "sender": "ผู้ขนส่ง",
@@ -1586,16 +1605,48 @@ def export_pdf():
         alignment=TA_LEFT,
     )
 
+    # data_rows = []
+    # for row in table_data:
+    #     row_cells = []
+    #     for col in columns:
+    #         value = str(row.get(col.lower(), "")).strip()
+    #         paragraph = Paragraph(value.replace("\n", "<br/>"), style)
+    #         row_cells.append(paragraph)
+    #     data_rows.append(row_cells)
+
+    #     header_style = ParagraphStyle(
+    #     name='HeaderStyle',
+    #     fontName=bold_font,
+    #     fontSize=9,
+    #     leading=11,
+    #     alignment=TA_CENTER,
+    #     textColor=colors.whitesmoke
+    # )
     data_rows = []
     for row in table_data:
         row_cells = []
         for col in columns:
-            value = str(row.get(col.lower(), "")).strip()
-            paragraph = Paragraph(value.replace("\n", "<br/>"), style)
+            value = row.get(col.lower(), "")
+
+            if col.lower() == "recorddate":
+                if value:
+                    try:
+                        dt = parsedate_to_datetime(value)
+                        value = dt.strftime("%d/%m/%Y")
+                    except Exception:
+                        # แปลงไม่ได้ ก็ใช้ค่าเดิม
+                        value = str(value).strip()
+                else:
+                    # กรณีวันที่ว่าง ให้แสดง "-"
+                    value = "-"
+
+            value_str = str(value).strip()
+            paragraph = Paragraph(value_str.replace("\n", "<br/>"), style)
             row_cells.append(paragraph)
         data_rows.append(row_cells)
 
-        header_style = ParagraphStyle(
+    # ย้ายส่วนนี้ออกมานอกลูป เพื่อสร้างแค่ครั้งเดียว
+    header_style = ParagraphStyle(
         name='HeaderStyle',
         fontName=bold_font,
         fontSize=9,
@@ -1648,11 +1699,9 @@ def export_pdf():
 
     doc.build(elements,onFirstPage=partial(draw_header, form_type=form_type),onLaterPages=partial(draw_header, form_type=form_type))
     buffer.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
-    return send_file(buffer,
-                mimetype='application/pdf',
-                download_name=f"{form_type}_Report.pdf",
-                as_attachment=True)
+    return send_file(buffer,mimetype='application/pdf',download_name=f"{form_type}_Report_{timestamp}.pdf",as_attachment=True)
 
 # if __name__ == '__main__':
 #     public_url = start_ngrok(PORT)

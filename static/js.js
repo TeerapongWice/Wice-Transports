@@ -1270,32 +1270,100 @@ document.addEventListener('DOMContentLoaded', function () {
   loadCustomerOptions();
 });
 
+// function exportDataArrayToExcel(dataArray, filename, formType) {
+//   if (!dataArray || dataArray.length === 0) {
+//     // alert("ไม่มีข้อมูลให้ Export");
+//     document.getElementById("ExcelError").classList.add("show");
+//     return;
+//   }
+
+//   // เลือกคอลัมน์ที่ต้องการ export ตาม formType
+//   const columnsDomestic = [
+//     "plate", "name", "sender", "customer", "queuetime", "startdeliver", "donedeliver",
+//     "confirmregis", "truckloadin", "startload", "doneload", "deliverytime", "status",
+//     "deliverytimetocustomer", "deliverydate", "recorddate", "remark"
+//   ];
+
+//   const columnsExport = [
+//     "pi", "eo", "containernumber", "plate", "name", "sender", "customer",
+//     "producttype", "queuetime", "startdeliver", "donedeliver", "truckloadin",
+//     "startload", "doneload", "recorddate", "remark"
+//   ];
+
+//   const selectedColumns = formType === "Domestic" ? columnsDomestic : columnsExport;
+
+//   // แปลง dataArray เป็น Array ของ Array (2D) สำหรับ Excel
+//   const header = selectedColumns;
+//   const body = dataArray.map(row =>
+//     selectedColumns.map(col => row[col] ?? "")
+//   );
+
+//   const worksheetData = [header, ...body];
+
+//   const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+//   const wb = XLSX.utils.book_new();
+//   XLSX.utils.book_append_sheet(wb, ws, "Export");
+
+//   XLSX.writeFile(wb, filename);
+// }
+
+// document.getElementById("ExcelDomestic").addEventListener("click", function () {
+//   exportDataArrayToExcel(currentDataDomestic, "Domestic_Exported.xlsx", "Domestic");
+// });
+
+// document.getElementById("ExcelExport").addEventListener("click", function () {
+//   exportDataArrayToExcel(currentDataExport, "Export_Exported.xlsx", "Export");
+// });
+function formatDateToDDMMYYYY(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (isNaN(date)) return dateStr; // ถ้าแปลงไม่ได้ คืนค่าเดิม
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 function exportDataArrayToExcel(dataArray, filename, formType) {
   if (!dataArray || dataArray.length === 0) {
-    // alert("ไม่มีข้อมูลให้ Export");
     document.getElementById("ExcelError").classList.add("show");
     return;
   }
 
-  // เลือกคอลัมน์ที่ต้องการ export ตาม formType
   const columnsDomestic = [
     "plate", "name", "sender", "customer", "queuetime", "startdeliver", "donedeliver",
     "confirmregis", "truckloadin", "startload", "doneload", "deliverytime", "status",
-    "deliverytimetocustomer", "deliverydate", "remark"
+    "deliverytimetocustomer", "deliverydate", "recorddate", "remark"
   ];
 
   const columnsExport = [
     "pi", "eo", "containernumber", "plate", "name", "sender", "customer",
     "producttype", "queuetime", "startdeliver", "donedeliver", "truckloadin",
-    "startload", "doneload", "remark"
+    "startload", "doneload", "recorddate", "remark"
+  ];
+
+  const headerDomesticTH = [
+    "ทะเบียน", "ชื่อพนักงานขับ", "ผู้ขนส่ง", "ลูกค้า", "เวลาที่รถลงคิว", "เริ่มตั้งสินค้า", "ตั้งสินค้าสำเร็จ",
+    "ขนส่งตอบรับทะเบียน", "รถเข้าโหลดสินค้า", "เริ่มโหลดสินค้า", "โหลดสินค้าสำเร็จ", "เวลาส่งสินค้า", "สถานะ",
+    "เวลาส่งถึงลูกค้า", "วันที่ส่งสินค้า", "วันที่บันทึก", "หมายเหตุ"
+  ];
+
+  const headerExportTH = [
+    "PI", "EO", "เบอร์ตู้", "ทะเบียน", "ชื่อพนักงานขับ", "ผู้ขนส่ง", "ลูกค้า",
+    "ชนิดสินค้า", "เวลาที่รถลงคิว", "เริ่มตั้งสินค้า", "ตั้งสินค้าสำเร็จ", "รถเข้าโหลดสินค้า",
+    "เริ่มโหลดสินค้า", "โหลดสินค้าสำเร็จ", "วันที่บันทึก", "หมายเหตุ"
   ];
 
   const selectedColumns = formType === "Domestic" ? columnsDomestic : columnsExport;
+  const header = formType === "Domestic" ? headerDomesticTH : headerExportTH;
 
-  // แปลง dataArray เป็น Array ของ Array (2D) สำหรับ Excel
-  const header = selectedColumns;
   const body = dataArray.map(row =>
-    selectedColumns.map(col => row[col] ?? "")
+    selectedColumns.map(col => {
+      if (col === "recorddate" || col === "deliverydate") {
+        return formatDateToDDMMYYYY(row[col]);
+      }
+      return row[col] ?? "";
+    })
   );
 
   const worksheetData = [header, ...body];
@@ -1315,6 +1383,7 @@ document.getElementById("ExcelExport").addEventListener("click", function () {
   exportDataArrayToExcel(currentDataExport, "Export_Exported.xlsx", "Export");
 });
 
+
 function exportDataArrayToPDF(dataArray, formType) {
   if (!dataArray || dataArray.length === 0) {
     // alert("ไม่มีข้อมูลให้ Export");
@@ -1323,13 +1392,13 @@ function exportDataArrayToPDF(dataArray, formType) {
   }
 
   const columnsDomestic = [
-    "plate", "name", "sender", "customer", "queuetime", "startdeliver", "donedeliver",
+    "recorddate", "plate", "name", "sender", "customer", "queuetime", "startdeliver", "donedeliver",
     "confirmregis", "truckloadin", "startload", "doneload", "deliverytime", "status",
     "deliverytimetocustomer", "deliverydate", "remark"
   ];
 
   const columnsExport = [
-    "pi", "eo", "containernumber", "plate", "name", "sender", "customer",
+    "recorddate", "pi", "eo", "containernumber", "plate", "name", "sender", "customer",
     "producttype", "queuetime", "startdeliver", "donedeliver", "truckloadin",
     "startload", "doneload", "remark"
   ];
