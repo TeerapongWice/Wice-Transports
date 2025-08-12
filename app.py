@@ -864,7 +864,7 @@ def search_data():
             sql = "SELECT * FROM Transports WHERE LOWER(FormType) = %s"
         else: # Export
             sql = """SELECT ID, Plate, Name, Sender, Customer, QueueTime, StartDeliver, DoneDeliver,
-                            TruckLoadIn, StartLoad, DoneLoad, PI, EO, Containernumber, Producttype, Remark
+                            TruckLoadIn, StartLoad, DoneLoad, PI, EO, Containernumber, Producttype, RecordDate, Remark
                      FROM Transports WHERE LOWER(FormType) = %s"""
 
         params = [form_type.lower()] # แปลงเป็น lowercase สำหรับการเปรียบเทียบ
@@ -1644,6 +1644,8 @@ def export_pdf():
             paragraph = Paragraph(value_str.replace("\n", "<br/>"), style)
             row_cells.append(paragraph)
         data_rows.append(row_cells)
+    print("=== form_type:", form_type)
+    print("=== columns:", columns)
 
     # ย้ายส่วนนี้ออกมานอกลูป เพื่อสร้างแค่ครั้งเดียว
     header_style = ParagraphStyle(

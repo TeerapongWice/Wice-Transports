@@ -1324,7 +1324,7 @@ function formatDateToDDMMYYYY(dateStr) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-function exportDataArrayToExcel(dataArray, filename, formType) {
+function exportDataArrayToExcel(dataArray, filenamePrefix, formType) {
   if (!dataArray || dataArray.length === 0) {
     document.getElementById("ExcelError").classList.add("show");
     return;
@@ -1368,6 +1368,22 @@ function exportDataArrayToExcel(dataArray, filename, formType) {
 
   const worksheetData = [header, ...body];
 
+  // const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+  // const wb = XLSX.utils.book_new();
+  // XLSX.utils.book_append_sheet(wb, ws, "Export");
+
+  // XLSX.writeFile(wb, filename);
+  // สร้าง timestamp แบบ yyyyMMdd_HHmm
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const timestamp = `${yyyy}${mm}${dd}_${hh}${min}`;
+
+  const filename = `${filenamePrefix}_${timestamp}.xlsx`;
+
   const ws = XLSX.utils.aoa_to_sheet(worksheetData);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Export");
@@ -1375,14 +1391,21 @@ function exportDataArrayToExcel(dataArray, filename, formType) {
   XLSX.writeFile(wb, filename);
 }
 
+// document.getElementById("ExcelDomestic").addEventListener("click", function () {
+//   exportDataArrayToExcel(currentDataDomestic, "Domestic_Exported.xlsx", "Domestic");
+// });
+
+// document.getElementById("ExcelExport").addEventListener("click", function () {
+//   exportDataArrayToExcel(currentDataExport, "Export_Exported.xlsx", "Export");
+// });
+// เรียกใช้งานใหม่ให้ส่ง prefix แทน filename เต็ม
 document.getElementById("ExcelDomestic").addEventListener("click", function () {
-  exportDataArrayToExcel(currentDataDomestic, "Domestic_Exported.xlsx", "Domestic");
+  exportDataArrayToExcel(currentDataDomestic, "Domestic_Exported", "Domestic");
 });
 
 document.getElementById("ExcelExport").addEventListener("click", function () {
-  exportDataArrayToExcel(currentDataExport, "Export_Exported.xlsx", "Export");
+  exportDataArrayToExcel(currentDataExport, "Export_Exported", "Export");
 });
-
 
 function exportDataArrayToPDF(dataArray, formType) {
   if (!dataArray || dataArray.length === 0) {
