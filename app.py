@@ -14,8 +14,8 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from functools import partial
 import subprocess, time, requests, json, os, pytz, sys, bcrypt, psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2 import errors as pg_errors # Import PostgreSQL specific errors
+import pyodbc
+
 from dotenv import load_dotenv
 from PIL import Image, ImageDraw, ImageFont
 import io
@@ -27,6 +27,11 @@ import base64
 import cloudinary
 import cloudinary.uploader
 from email.utils import parsedate_to_datetime
+import logging
+from functools import partial
+# ... (ส่วน import ที่มีอยู่เดิม)
+# ปรับปรุง: ใช้ logging แทน print
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 load_dotenv()
 
@@ -55,9 +60,9 @@ LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
 if not LINE_CHANNEL_ACCESS_TOKEN:
     raise Exception("LINE_CHANNEL_ACCESS_TOKEN environment variable is not set.")
 
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if not DATABASE_URL:
-    raise Exception("DATABASE_URL environment variable is not set.")
+# DATABASE_URL = os.environ.get('DATABASE_URL')
+# if not DATABASE_URL:
+#     raise Exception("DATABASE_URL environment variable is not set.")
 
 cloudinary.config(
   cloud_name = os.environ.get("CLOUDINARY_CLOUD_NAME"),
@@ -66,15 +71,33 @@ cloudinary.config(
   secure=True
 )
 
+# def get_db_connection():
+#     conn_str = os.environ.get("SQLSERVER_CONN")
+#     if not conn_str:
+#         raise Exception("SQLSERVER_CONN environment variable is not set.")
+#     return pyodbc.connect(conn_str)
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL)
+    # ปรับปรุง: การจัดการ connection pool
+    # สำหรับ pyodbc ไม่มี built-in connection pool แต่สามารถทำเองได้
+    # หรือใช้ไลบรารีภายนอกที่ช่วยจัดการ
+    # สำหรับโค้ดนี้ จะยังคงใช้รูปแบบเดิม แต่แนะนำให้ปรับปรุงในอนาคต
+    conn_str = os.environ.get("SQLSERVER_CONN")
+    if not conn_str:
+        logging.error("SQLSERVER_CONN environment variable is not set.")
+        raise Exception("SQLSERVER_CONN environment variable is not set.")
+    try:
+        return pyodbc.connect(conn_str)
+    except pyodbc.Error as e:
+        sqlstate = e.args[0]
+        logging.error(f"Database connection error: {sqlstate} - {e}")
+        raise
 
 @app.route('/api/users')
 def get_users():
     try:
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)  # ใช้ RealDictCursor เพื่อให้ได้ dict แทน tuple
-        cur.execute('SELECT id, username, role FROM users_login;')
+        cur = conn.cursor()  # ใช้ RealDictCursor เพื่อให้ได้ dict แทน tuple
+        cur.execute('SELECT id, username, role FROM FG_Transport_Users_Login;')
         users = cur.fetchall()
         cur.close()
         conn.close()
@@ -98,8 +121,8 @@ def login():
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        # เปลี่ยน ? เป็น %s สำหรับ PostgreSQL
-        cursor.execute("SELECT password, role FROM Users_Login WHERE username = %s", (username,))
+        # เปลี่ยน ? เป็น ? สำหรับ PostgreSQL
+        cursor.execute("SELECT password, role FROM FG_Transport_Users_Login WHERE username = ?", (username,))
         row = cursor.fetchone()
         conn.close()
 
@@ -131,50 +154,78 @@ font_bold_path = resource_path("fonts/THSarabunNew-Bold.ttf")
 pdfmetrics.registerFont(TTFont('THSarabunNew-Bold', font_bold_path))
 # NGROK_PATH = resource_path("ngrok.exe")
 
+# def save_or_update_user(user_id):
+#     try:
+#         conn = get_db_connection()
+#         cur = conn.cursor()
+
+#         # ตรวจสอบว่ามี user_id ใน DB หรือยัง
+#         cur.execute("SELECT * FROM FG_Transport_Users WHERE userId = ?", (user_id,))
+#         existing = cur.fetchone()
+
+#         if existing:
+#             print(f"ℹ️ userId {user_id} มีอยู่แล้วในฐานข้อมูล")
+#         else:
+#             # ดึงข้อมูลโปรไฟล์จาก LINE
+#             profile = get_user_profile(user_id)
+#             if profile:
+#                 display_name = profile.get("displayName", "")
+#                 picture_url = profile.get("pictureUrl", "")
+
+#                 cur.execute("""
+#                     INSERT INTO FG_Transport_Users (userId, displayName, pictureUrl)
+#                     VALUES (?, ?, ?)
+#                     /* TODO: Implement IF NOT EXISTS for SQL Server */
+#                 """, (user_id, display_name, picture_url))
+#                 conn.commit()
+#                 print(f"✅ บันทึก userId ใหม่: {user_id}")
+#             else:
+#                 print("❌ ไม่สามารถดึง profile จาก LINE ได้")
+
+#         cur.close()
+#         conn.close()
+#     except Exception as e:
+#         print(f"❌ save_or_update_user error: {e}")
 def save_or_update_user(user_id):
+    if not user_id:
+        logging.warning("User ID is None. Cannot save.")
+        return
+
     try:
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # ตรวจสอบว่ามี user_id ใน DB หรือยัง
-        cur.execute("SELECT * FROM Users WHERE userId = %s", (user_id,))
-        existing = cur.fetchone()
+        cur.execute("SELECT 1 FROM FG_Transport_Users WHERE userId = ?", (user_id,))
+        if cur.fetchone():
+            logging.info(f"User ID {user_id} already exists.")
+            return
 
-        if existing:
-            print(f"ℹ️ userId {user_id} มีอยู่แล้วในฐานข้อมูล")
-        else:
-            # ดึงข้อมูลโปรไฟล์จาก LINE
-            profile = get_user_profile(user_id)
-            if profile:
-                display_name = profile.get("displayName", "")
-                picture_url = profile.get("pictureUrl", "")
+        profile = get_user_profile(user_id)
+        if not profile:
+            logging.warning("Could not fetch profile from LINE.")
+            return
 
-                cur.execute("""
-                    INSERT INTO Users (userId, displayName, pictureUrl)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (userId) DO NOTHING
-                """, (user_id, display_name, picture_url))
-                conn.commit()
-                print(f"✅ บันทึก userId ใหม่: {user_id}")
-            else:
-                print("❌ ไม่สามารถดึง profile จาก LINE ได้")
+        display_name = profile.get("displayName", "")
+        picture_url = profile.get("pictureUrl", "")
 
-        cur.close()
-        conn.close()
+        cur.execute(
+            "INSERT INTO FG_Transport_Users (userId, displayName, pictureUrl) VALUES (?, ?, ?)",
+            (user_id, display_name, picture_url)
+        )
+        conn.commit()
+        logging.info(f"Successfully saved new user ID: {user_id}")
+
+    except pyodbc.IntegrityError:
+        logging.warning(f"IntegrityError: User ID {user_id} might be a duplicate.")
     except Exception as e:
-        print(f"❌ save_or_update_user error: {e}")
- 
-# def get_group_profile(group_id):
-#     url = f'https://api.line.me/v2/bot/group/{group_id}/summary'
-#     headers = {
-#         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
-#     }
-#     res = requests.get(url, headers=headers)
-#     if res.status_code == 200:
-#         return res.json()  # จะได้ dict ที่มี groupName, pictureUrl
-#     else:
-#         print("❌ Error fetching group profile:", res.status_code, res.text)
-#         return None
+        logging.error(f"Error in save_or_update_user: {e}", exc_info=True)
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
+
+
 def get_group_profile(group_id):
     url = f'https://api.line.me/v2/bot/group/{group_id}/summary'
     headers = {
@@ -200,20 +251,20 @@ def store_group_id(group_id, group_name=None, group_picture=None):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # ใช้ %s สำหรับ PostgreSQL และเปลี่ยน COUNT(*) เป็น EXISTS
-        cursor.execute("SELECT EXISTS(SELECT 1 FROM Groups WHERE group_id = %s)", (group_id,))
+        # ใช้ ? สำหรับ PostgreSQL และเปลี่ยน COUNT(*) เป็น EXISTS
+        cursor.execute("SELECT EXISTS(SELECT 1 FROM FG_Transport_Groups WHERE group_id = ?)", (group_id,))
         exists = cursor.fetchone()[0] # [0] เพื่อดึงค่า boolean ออกมา
 
         group_name = group_name or ''
         group_picture = group_picture or ''
         if not exists: # ถ้าไม่มีอยู่แล้ว
             cursor.execute(
-                "INSERT INTO Groups (group_id, group_name, group_picture) VALUES (%s, %s, %s)",
+                "INSERT INTO FG_Transport_Groups (group_id, group_name, group_picture) VALUES (?, ?, ?)",
                 (group_id, group_name, group_picture)
             )
         else:
             cursor.execute(
-                "UPDATE Groups SET group_name = %s, group_picture = %s WHERE group_id = %s",
+                "UPDATE FG_Transport_Groups SET group_name = ?, group_picture = ? WHERE group_id = ?",
                 (group_name, group_picture, group_id)
             )
         conn.commit()
@@ -279,7 +330,7 @@ def send_line_message_to_all(message):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT userId FROM Users")
+        cursor.execute("SELECT userId FROM FG_Transport_Users")
         user_ids = [row[0] for row in cursor.fetchall()]
     except Exception as e:
         print("❌ send_line_message_to_all error:", e)
@@ -295,100 +346,15 @@ def send_line_message_to_all(message):
 def get_user_ids():
     conn = get_db_connection()
     # ใช้ RealDictCursor เพื่อให้ได้ dict ที่มีชื่อคอลัมน์เป็น key
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT userId, displayName, pictureUrl FROM Users")
+    cursor = conn.cursor()
+    cursor.execute("SELECT userId, displayName, pictureUrl FROM FG_Transport_Users")
     rows = cursor.fetchall()
     conn.close()
     # เนื่องจากใช้ RealDictCursor แล้ว ไม่ต้องแปลงเป็น dict อีก
-    users = [{'userId': row['userid'], 'displayName': row['displayname'], 'pictureUrl': row['pictureurl']} for row in rows] # PostgreSQL จะแปลงชื่อคอลัมน์เป็น lowercase
+    # users = [{'userId': row['userid'], 'displayName': row['displayname'], 'pictureUrl': row['pictureurl']} for row in rows] # PostgreSQL จะแปลงชื่อคอลัมน์เป็น lowercase
+    users = [{'userId': row[0], 'displayName': row[1], 'pictureUrl': row[2]} for row in rows]
     return jsonify({'users': users})
 
-# @app.route('/send_line_to_selected', methods=['POST'])
-# def send_line_notify():
-#     try:
-#         data = request.get_json(force=True)
-#         if not data:
-#             return jsonify({'success': False, 'error': 'No JSON received'}), 400
-
-#         user_ids = data.get('user_ids', [])
-#         group_ids = data.get('group_ids', [])
-#         row_ids = data.get('ids', [])
-#         form_type = data.get('formType')
-
-#         print('user_ids:', user_ids)
-#         print('group_ids:', group_ids)
-#         print('row_ids:', row_ids)
-#         print('formType:', form_type)
-
-#         if not row_ids:
-#             return jsonify({'success': False, 'error': 'No row_ids provided to send LINE message.'}), 400
-
-#         # ดึงข้อมูลจาก Transports เฉพาะรายการที่เลือก
-#         # ใช้ %s สำหรับ PostgreSQL parameters และปรับเปลี่ยน IN clause
-#         placeholders = ','.join(['%s'] * len(row_ids))
-#         conn = get_db_connection()
-#         # ใช้ RealDictCursor เพื่อให้เข้าถึงข้อมูลด้วยชื่อคอลัมน์ได้ง่ายขึ้น
-#         cursor = conn.cursor(cursor_factory=RealDictCursor)
-#         query = f"SELECT * FROM Transports WHERE ID IN ({placeholders}) AND FormType = %s"
-#         cursor.execute(query, (*row_ids, form_type))
-#         rows = cursor.fetchall()
-#         cursor.close()
-#         conn.close()
-
-#         for row in rows:
-#             # PostgreSQL มักจะคืนชื่อคอลัมน์เป็น lowercase
-#             if form_type.lower() == "domestic": # ใช้ .lower() เพื่อความชัวร์
-#                 msg = (
-#                     f"ทะเบียน: {row.get('plate', '-')}\n"
-#                     f"ชื่อ: {row.get('name', '-')}\n"
-#                     f"ผู้ขนส่ง: {row.get('sender', '-')}\n"
-#                     f"ลูกค้า: {row.get('customer', '-')}\n"
-#                     f"Delivery Date: {row.get('deliverydate', '-')}\n"
-#                     f"เริ่มโหลดสินค้า: {row.get('startload', '-')}\n"
-#                     f"โหลดสินค้าเสร็จ: {row.get('doneload', '-')}\n"
-#                     f"เวลาส่งสินค้า: {row.get('deliverytime', '-')}\n"
-#                     f"Status: {row.get('status', '-')}\n"
-#                     f"เวลาส่งถึงลูกค้า: {row.get('deliverytimetocustomer', '-')}\n"
-#                     f"หมายเหตุ: {row.get('remark', '-')}\n"
-#                     f"---------------------------"
-#                 )
-#             elif form_type.lower() == "export": # ใช้ .lower() เพื่อความชัวร์
-#                 msg = (
-#                     f"PI: {row.get('pi', '-')}\n"
-#                     f"ทะเบียน: {row.get('plate', '-')}\n"
-#                     f"ชื่อ: {row.get('name', '-')}\n"
-#                     f"ผู้ขนส่ง: {row.get('sender', '-')}\n"
-#                     f"ประเทศ: {row.get('customer', '-')}\n"
-#                     f"ถึงโรงงาน: {row.get('queuetime', '-')}\n"
-#                     f"เริ่มตั้ง: {row.get('startdeliver', '-')}\n"
-#                     f"ตั้งเสร็จ: {row.get('donedeliver', '-')}\n"
-#                     f"เข้าช่องโหลด: {row.get('truckloadin', '-')}\n"
-#                     f"เริ่มโหลด: {row.get('startload', '-')}\n"
-#                     f"โหลดเสร็จ: {row.get('doneload', '-')}\n"
-#                     f"หมายเหตุ: {row.get('remark', '-')}\n"
-#                     f"---------------------------"
-#                 )
-#             else:
-#                 continue
-
-#             # เตรียมข้อความพร้อม prefix
-#             short_message = f"[WICE TRANSPORT - {form_type.upper()}]\n\n" + msg[:950]  # Limit for LINE push
-
-#             # ส่งไปยัง user แต่ละคน
-#             for uid in user_ids:
-#                 success = send_line_message(uid, short_message)
-#                 print(f"ส่งหา {uid}: {'✅ สำเร็จ' if success else '❌ ล้มเหลว'}")
-
-#             # ส่งไปยัง group แต่ละกลุ่ม
-#             for gid in group_ids:
-#                 success = send_line_message_to_group(gid, short_message)
-#                 print(f"ส่งหา {gid}: {'✅ สำเร็จ' if success else '❌ ล้มเหลว'}")
-
-#         return jsonify({'success': True})
-
-#     except Exception as e:
-#         print("❌ Error sending LINE message:", e)
-#         return jsonify({'success': False, 'error': str(e)}), 400
 def upload_image_to_cloudinary(image_pil):
     # แปลง PIL image เป็น buffer
     buf = io.BytesIO()
@@ -445,28 +411,17 @@ def save_image(image_pil, filename=None):
 
 def save_to_db(filename):
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor = conn.cursor()
     
     # เพิ่มคอลัมน์ timestamp ไว้เก็บวันเวลาที่บันทึก (หากมีใน table)
     cursor.execute("""
-        INSERT INTO images (filename, uploaded_at)
-        VALUES (%s, %s)
+        INSERT INTO FG_Transport_images (filename, uploaded_at)
+        VALUES (?, ?)
     """, (filename, datetime.now()))
     
     conn.commit()
     cursor.close()
     conn.close()
-
-@app.route('/images')
-def show_images():
-    conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT * FROM images ORDER BY uploaded_at DESC")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    
-    return render_template('images.html', rows=rows)
 
 def load_thai_font(size: int = 20, bold: bool = False) -> ImageFont.FreeTypeFont:
     """
@@ -658,9 +613,54 @@ def download_image():
     response.headers.set('Content-Disposition', f'attachment; filename="{filename}"')
     return response
 
+# @app.route('/send_line_to_selected', methods=['POST'])
+# def send_line_to_selected():
+#     data = request.json
+
+#     user_ids = data.get('user_ids', [])
+#     group_ids = data.get('group_ids', [])
+#     ids = data.get('ids', [])
+#     form_type = data.get('formType', '').lower()
+
+#     if (not user_ids and not group_ids) or not ids or not form_type:
+#         return jsonify({'error': 'user_ids/group_ids, ids or formType missing'}), 400
+
+#     # ดึงข้อมูลจาก DB ตาม ids ที่รับมา
+#     try:
+#         conn = get_db_connection()
+#         cur = conn.cursor()
+#         ids_int = tuple(map(int, ids))
+#         query = f"SELECT * FROM FG_Transport_Transports WHERE id IN ?"
+#         cur.execute(query, (ids_int,))
+#         rows = cur.fetchall()
+#         cur.close()
+#         conn.close()
+#     except Exception as e:
+#         return jsonify({'error': f'Database error: {e}'}), 500
+
+#     # สร้างรูปภาพ
+#     image_buf = generate_image_table_from_rows(rows, form_type)
+
+#     results = {}
+
+#     # ส่งให้ผู้ใช้
+#     for uid in user_ids:
+#         # success = send_line_image_push(uid, image_buf)
+#         success = send_line_image_push_cloudinary(uid, image_buf)
+#         results[uid] = success
+
+#     # ส่งให้กลุ่ม
+#     for gid in group_ids:
+#         # success = send_line_image_push(gid, image_buf)
+#         success = send_line_image_push_cloudinary(gid, image_buf)
+#         results[gid] = success
+
+#     return jsonify({'results': results})
 @app.route('/send_line_to_selected', methods=['POST'])
 def send_line_to_selected():
     data = request.json
+    if not data:
+        return jsonify({'error': 'No JSON payload'}), 400
 
     user_ids = data.get('user_ids', [])
     group_ids = data.get('group_ids', [])
@@ -670,14 +670,16 @@ def send_line_to_selected():
     if (not user_ids and not group_ids) or not ids or not form_type:
         return jsonify({'error': 'user_ids/group_ids, ids or formType missing'}), 400
 
-    # ดึงข้อมูลจาก DB ตาม ids ที่รับมา
+    # ดึงข้อมูลจาก DB
     try:
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = conn.cursor()
         ids_int = tuple(map(int, ids))
-        query = f"SELECT * FROM Transports WHERE id IN %s"
-        cur.execute(query, (ids_int,))
-        rows = cur.fetchall()
+        placeholders = ','.join(['?'] * len(ids_int))
+        query = f"SELECT * FROM FG_Transport_Transports WHERE id IN ({placeholders})"
+        cur.execute(query, ids_int)
+        columns = [col[0] for col in cur.description]
+        rows = [dict(zip(columns, row)) for row in cur.fetchall()]
         cur.close()
         conn.close()
     except Exception as e:
@@ -686,19 +688,14 @@ def send_line_to_selected():
     # สร้างรูปภาพ
     image_buf = generate_image_table_from_rows(rows, form_type)
 
+    # ส่งให้ผู้ใช้และกลุ่ม
     results = {}
-
-    # ส่งให้ผู้ใช้
-    for uid in user_ids:
-        # success = send_line_image_push(uid, image_buf)
-        success = send_line_image_push_cloudinary(uid, image_buf)
-        results[uid] = success
-
-    # ส่งให้กลุ่ม
-    for gid in group_ids:
-        # success = send_line_image_push(gid, image_buf)
-        success = send_line_image_push_cloudinary(gid, image_buf)
-        results[gid] = success
+    for uid in user_ids + group_ids:
+        try:
+            success = send_line_image_push_cloudinary(uid, image_buf)
+            results[uid] = success
+        except Exception as e:
+            results[uid] = f"Error: {e}"
 
     return jsonify({'results': results})
 
@@ -762,49 +759,6 @@ def callback():
 
     return 'OK'
 
-# def start_ngrok(port=PORT):
-#     """Start ngrok tunnel"""
-#     print("🚀 Starting ngrok...")
-#     try:
-#         # ใช้ command line arguments ที่ถูกต้องสำหรับ ngrok v3+
-#         # 'ngrok http 5000'
-#         subprocess.Popen([NGROK_PATH, "http", str(PORT)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-#         time.sleep(5)  # wait for ngrok to start (อาจต้องปรับเวลา)
-
-#         # Get public URL
-#         ngrok_api = "http://localhost:4040/api/tunnels"
-#         r = requests.get(ngrok_api)
-#         r.raise_for_status() # ตรวจสอบสถานะ http error
-#         tunnels = r.json()["tunnels"]
-#         if tunnels:
-#             public_url = tunnels[0]["public_url"]
-#             print(f"🌐 ngrok URL: {public_url}")
-#             return public_url
-#         else:
-#             print("❌ No ngrok tunnels found.")
-#             return None
-#     except requests.exceptions.ConnectionError:
-#         print("❌ Could not connect to ngrok API. Is ngrok running?")
-#         return None
-#     except Exception as e:
-#         print("❌ Failed to get ngrok URL:", e)
-#         return None
-
-# def set_line_webhook(webhook_url):
-#     print("🔗 Setting LINE webhook...")
-#     headers = {
-#         "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
-#         "Content-Type": "application/json"
-#     }
-#     # ให้ตรงกับ route
-#     data = {"endpoint": webhook_url + "/callback"}
-#     r = requests.put(
-#         "https://api.line.me/v2/bot/channel/webhook/endpoint",
-#         headers=headers,
-#         data=json.dumps(data)
-#     )
-#     print("📡 Webhook response:", r.status_code, r.text)
-
 def set_line_webhook(webhook_url):
     print("🔗 Setting LINE webhook...")
     headers = {
@@ -819,27 +773,39 @@ def set_line_webhook(webhook_url):
     )
     print("📡 Webhook response:", r.status_code, r.text)
 
+def dict_factory(cursor):
+    columns = [col[0].lower() for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
 @app.route('/form')
 def form():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor = conn.cursor()
         today = datetime.today().date()
 
-        cursor.execute("SELECT * FROM Transports WHERE TRIM(LOWER(FormType)) = %s AND RecordDate = %s", ('domestic', today))
-        domestic_data = cursor.fetchall()
-        # cursor.execute("""SELECT ID, Plate, Name, Sender, Customer, QueueTime, StartDeliver, DoneDeliver, TruckLoadIn, StartLoad, DoneLoad, PI, EO, Containernumber, Producttype, Remark FROM Transports WHERE TRIM(LOWER(FormType)) = %s AND RecordDate = %s""", ('export', today))
-        cursor.execute("""SELECT ID, Plate, Name, Sender, Customer, QueueTime, StartDeliver, DoneDeliver, TruckLoadIn, StartLoad, DoneLoad, PI, EO, Containernumber AS containernumber, Producttype AS producttype, Remark FROM Transports WHERE TRIM(LOWER(FormType)) = %s AND RecordDate = %s """, ('export', today))
-        export_data = cursor.fetchall()
+        cursor.execute("""
+            SELECT * FROM FG_Transport_Transports 
+            WHERE TRIM(LOWER(FormType)) = ? AND RecordDate = ?
+            ORDER BY RecordDate DESC, ID ASC
+        """, ('domestic', today))
+        # domestic_data = cursor.fetchall()
+        domestic_data = dict_factory(cursor)
+
+        cursor.execute("""
+            SELECT ID, Plate, Name, Sender, Customer, QueueTime, StartDeliver, DoneDeliver, TruckLoadIn, 
+                StartLoad, DoneLoad, PI, EO, Containernumber AS containernumber, Producttype AS producttype, Remark
+            FROM FG_Transport_Transports 
+            WHERE TRIM(LOWER(FormType)) = ? AND RecordDate = ?
+            ORDER BY RecordDate DESC, ID ASC
+        """, ('export', today))
+        # export_data = cursor.fetchall()
+        export_data = dict_factory(cursor)
 
         cursor.close()
         conn.close()
 
-        return render_template('form.html',
-                               username=session['username'],
-                               role=session['role'],
-                               domestic_data=domestic_data,
-                               export_data=export_data)
+        return render_template('form.html',username=session['username'],role=session['role'],domestic_data=domestic_data,export_data=export_data)
     except Exception as e:
         return f"Error loading form: {e}"
 
@@ -856,45 +822,49 @@ def search_data():
 
     try:
         conn = get_db_connection()
-        # ใช้ RealDictCursor เพื่อคืนค่าเป็น dict
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor = conn.cursor()
 
-        # Base SQL - ใช้ LOWER() สำหรับ FormType เพื่อให้ case-insensitive
+        # Base SQL
         if form_type == 'Domestic':
-            sql = "SELECT * FROM Transports WHERE LOWER(FormType) = %s"
-        else: # Export
+            sql = "SELECT * FROM FG_Transport_Transports WHERE LOWER(FormType) = ?"
+        else:
             sql = """SELECT ID, Plate, Name, Sender, Customer, QueueTime, StartDeliver, DoneDeliver,
                             TruckLoadIn, StartLoad, DoneLoad, PI, EO, Containernumber, Producttype, RecordDate, Remark
-                     FROM Transports WHERE LOWER(FormType) = %s"""
+                     FROM FG_Transport_Transports WHERE LOWER(FormType) = ?"""
 
-        params = [form_type.lower()] # แปลงเป็น lowercase สำหรับการเปรียบเทียบ
+        params = [form_type.lower()]
 
-        # เงื่อนไขวันที่
+        # Filter by date
         if start_date_str and end_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            sql += " AND RecordDate BETWEEN %s AND %s"
+            sql += " AND RecordDate BETWEEN ? AND ?"
             params.extend([start_date, end_date])
-        elif start_date_str: # ถ้าเลือกวันเดียวจาก start_date
+        elif start_date_str:
             date_obj = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            sql += " AND RecordDate = %s"
+            sql += " AND RecordDate = ?"
             params.append(date_obj)
-        elif date_str: # fallback กรณีใช้ date ธรรมดา
+        elif date_str:
             date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
-            sql += " AND RecordDate = %s"
+            sql += " AND RecordDate = ?"
             params.append(date_obj)
 
-        # เงื่อนไข keyword - ใช้ ILIKE สำหรับ case-insensitive search ใน PostgreSQL
+        # Keyword
         if keyword:
-            sql += " AND (Plate ILIKE %s OR Name ILIKE %s)"
+            sql += " AND (Plate LIKE ? OR Name LIKE ?)"
             keyword_param = f"%{keyword}%"
             params.extend([keyword_param, keyword_param])
 
+        sql += " ORDER BY RecordDate DESC, ID ASC"
+
         # Execute
         cursor.execute(sql, params)
-        rows = cursor.fetchall() # RealDictCursor คืนค่าเป็น list of dicts แล้ว
+        columns = [col[0] for col in cursor.description]  # เอาชื่อ column
+        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]  # map → dict
+        rows = [{k.lower(): v for k, v in r.items()} for r in rows]
+        
         conn.close()
-        return jsonify({'success': True, 'data': rows}) # rows เป็น dicts อยู่แล้ว
+        return jsonify({'success': True, 'data': rows})
 
     except Exception as e:
         print("Search error:", e)
@@ -934,12 +904,12 @@ def submit():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        # เปลี่ยน ? เป็น %s สำหรับ PostgreSQL
+        # เปลี่ยน ? เป็น ? สำหรับ PostgreSQL
         cursor.execute("""
-            INSERT INTO Transports
+            INSERT INTO FG_Transport_Transports
             (Plate, Name, Sender, Customer, QueueTime, StartDeliver, DoneDeliver,
              ConfirmRegis, TruckLoadIn, StartLoad, DoneLoad, Deliverytime, Status, Deliverytimetocustomer, DeliveryDate, PI, EO, Containernumber, Producttype, FormType, RecordDate)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (plate, name, sender, customer, arrival_time, start_unload, end_unload,
               reg_receive, truck_unload, start_load, end_load, Delivery_time, Status, Deliverytime_tocustomer, Delivery_Date, Pi, Eo, Container_number, Product_type, form_type, date_value))
         conn.commit()
@@ -950,58 +920,7 @@ def submit():
     except Exception as e:
         print("Error:", e)
         return f'Error: {e}', 500
-# def import_excel():
-#     file = request.files.get('excelFile')
-#     form_type = request.form.get('formType')
-#     if not file:
-#         return jsonify({'success': False, 'error': 'No file uploaded.'}), 400
 
-#     try:
-#         df = pd.read_excel(file)
-
-#         # แปลงวันที่ RecordDate
-#         if 'RecordDate' in df.columns:
-#             # ใช้ errors='coerce' เพื่อให้ค่าที่ไม่ถูกต้องกลายเป็น NaT (Not a Time)
-#             df['RecordDate'] = pd.to_datetime(df['RecordDate'], dayfirst=True, errors='coerce')
-#             # แปลง NaT เป็น None เพื่อให้ psycopg2 จัดการได้
-#             df['RecordDate'] = df['RecordDate'].apply(lambda x: x.date() if pd.notna(x) else None)
-
-#         conn = get_db_connection() # ใช้ฟังก์ชัน get_db_connection ที่เชื่อมต่อกับ PostgreSQL
-#         cursor = conn.cursor()
-
-#         # สร้างรายการคอลัมน์ทั้งหมดที่ Transports มี
-#         # ต้องแน่ใจว่าคอลัมน์ใน DB และใน Excel ตรงกัน หรือปรับให้ตรง
-#         db_columns = [
-#             "Plate", "Name", "Sender", "Customer", "QueueTime", "StartDeliver", "DoneDeliver",
-#             "ConfirmRegis", "TruckLoadIn", "StartLoad", "DoneLoad", "Deliverytime", "Status",
-#             "Deliverytimetocustomer", "DeliveryDate", "PI", "EO", "Containernumber", "Producttype",
-#             "FormType", "RecordDate"
-#         ]
-#         # สร้าง placeholder สำหรับ INSERT
-#         placeholders = ', '.join(['%s'] * len(db_columns))
-#         insert_query = f"INSERT INTO Transports ({', '.join(db_columns)}) VALUES ({placeholders})"
-
-#         for index, row in df.iterrows():
-#             # เตรียมข้อมูลตามลำดับคอลัมน์ของ db_columns
-#             values = []
-#             for col in db_columns:
-#                 if col == 'FormType':
-#                     values.append(form_type)
-#                 elif col == 'RecordDate':
-#                     values.append(row.get(col, None)) # ใช้ None ถ้าไม่มีค่า
-#                 else:
-#                     values.append(str(row.get(col, '')) if pd.notna(row.get(col)) else '') # แปลงเป็น str และจัดการ NaN
-
-#             cursor.execute(insert_query, tuple(values))
-
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-
-#         return jsonify({'success': True})
-#     except Exception as e:
-#         print("Error importing Excel:", e)
-#         return jsonify({'success': False, 'error': str(e)}), 500
 def clean_value(val):
     if val is None:
         return ""
@@ -1022,16 +941,16 @@ def import_excel():
     df['RecordDate'] = df['RecordDate'].apply(lambda x: x.date() if pd.notna(x) else None)
 
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor = conn.cursor()
 
     insert_query = """
-        INSERT INTO Transports (
+        INSERT INTO FG_Transport_Transports (
             Plate, Name, Sender, Customer, QueueTime,
             StartDeliver, DoneDeliver, ConfirmRegis, TruckLoadIn,
             StartLoad, DoneLoad, Deliverytime, Status,
             Deliverytimetocustomer, DeliveryDate, PI, EO,
-            Containernumber, Producttype, RecordDate, FormType
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            Containernumber, Producttype, Remark, RecordDate, FormType
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
     inserted_count = 0
@@ -1042,7 +961,7 @@ def import_excel():
         record_date = row.get("RecordDate")
 
         # เช็คว่ามีข้อมูลนี้อยู่แล้วหรือยัง
-        check_query = "SELECT * FROM Transports WHERE Plate = %s AND RecordDate = %s"
+        check_query = "SELECT * FROM FG_Transport_Transports WHERE Plate = ? AND RecordDate = ?"
         cursor.execute(check_query, (plate, record_date))
         existing = cursor.fetchone()
 
@@ -1056,21 +975,21 @@ def import_excel():
                 "Name", "Sender", "Customer", "QueueTime", "StartDeliver", "DoneDeliver",
                 "ConfirmRegis", "TruckLoadIn", "StartLoad", "DoneLoad", "Deliverytime",
                 "Status", "Deliverytimetocustomer", "DeliveryDate", "PI", "EO",
-                "Containernumber", "Producttype", "FormType"
+                "Containernumber", "Producttype", "Remark", "FormType"
             ]
 
             for col in columns:
                 val = form_type if col == "FormType" else row.get(col)
                 val = clean_value(val)
                 if val != "":
-                    fields_to_update.append(f"{col} = %s")
+                    fields_to_update.append(f"{col} = ?")
                     values_to_update.append(val)
 
             if fields_to_update:
                 update_query = f"""
-                    UPDATE Transports SET
+                    UPDATE FG_Transport_Transports SET
                     {', '.join(fields_to_update)}
-                    WHERE Plate = %s AND RecordDate = %s
+                    WHERE Plate = ? AND RecordDate = ?
                 """
                 values_to_update.extend([plate, record_date])
                 cursor.execute(update_query, values_to_update)
@@ -1101,6 +1020,7 @@ def import_excel():
                 clean_value(row.get("EO")),
                 clean_value(row.get("Containernumber")),
                 clean_value(row.get("Producttype")),
+                clean_value(row.get("Remark")),
                 record_date,
                 form_type
             ]
@@ -1126,11 +1046,11 @@ def update():
 
         if 'confirmregis' in data:
             cursor.execute("""
-                UPDATE Transports SET
-                    Plate=%s, Name=%s, Sender=%s, Customer=%s, QueueTime=%s,
-                    StartDeliver=%s, DoneDeliver=%s, ConfirmRegis=%s, TruckLoadIn=%s,
-                    StartLoad=%s, DoneLoad=%s, Deliverytime=%s, Status=%s, Deliverytimetocustomer=%s, DeliveryDate=%s, Remark=%s
-                WHERE ID=%s
+                UPDATE FG_Transport_Transports SET
+                    Plate=?, Name=?, Sender=?, Customer=?, QueueTime=?,
+                    StartDeliver=?, DoneDeliver=?, ConfirmRegis=?, TruckLoadIn=?,
+                    StartLoad=?, DoneLoad=?, Deliverytime=?, Status=?, Deliverytimetocustomer=?, DeliveryDate=?, Remark=?
+                WHERE ID=?
             """, (
                 data['plate'], data['name'], data['sender'], data['customer'], data['arrivalTime'],
                 data['startUnload'], data['endUnload'], data['confirmregis'], data['truckUnload'],
@@ -1139,11 +1059,11 @@ def update():
             ))
         else: # Export update
             cursor.execute("""
-                UPDATE Transports SET
-                    Plate=%s, Name=%s, Sender=%s, Customer=%s, QueueTime=%s,
-                    StartDeliver=%s, DoneDeliver=%s, TruckLoadIn=%s,
-                    StartLoad=%s, DoneLoad=%s, PI=%s, EO=%s, Containernumber=%s, Producttype=%s, Remark=%s
-                WHERE ID=%s
+                UPDATE FG_Transport_Transports SET
+                    Plate=?, Name=?, Sender=?, Customer=?, QueueTime=?,
+                    StartDeliver=?, DoneDeliver=?, TruckLoadIn=?,
+                    StartLoad=?, DoneLoad=?, PI=?, EO=?, Containernumber=?, Producttype=?, Remark=?
+                WHERE ID=?
             """, (
                 data['plate'], data['name'], data['sender'], data['customer'], data['arrivalTime'],
                 data['startUnload'], data['endUnload'], data['truckUnload'],
@@ -1166,7 +1086,7 @@ def delete():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM Transports WHERE ID = %s", (record_id,))
+        cursor.execute("DELETE FROM FG_Transport_Transports WHERE ID = ?", (record_id,))
         conn.commit()
         cursor.close()
         conn.close()
@@ -1179,13 +1099,14 @@ def delete():
 def get_group_ids():
     conn = get_db_connection()
     # ใช้ RealDictCursor เพื่อคืนค่าเป็น dict
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT group_id, group_name, group_picture FROM Groups")
+    cursor = conn.cursor()
+    cursor.execute("SELECT group_id, group_name, group_picture FROM FG_Transport_Groups")
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
     # ปรับชื่อ key ให้เป็น lowercase ตาม PostgreSQL ถ้าจำเป็น
-    groups = [{'group_id': row['group_id'], 'group_name': row['group_name'], 'group_picture': row['group_picture']} for row in rows]
+    # groups = [{'group_id': row['group_id'], 'group_name': row['group_name'], 'group_picture': row['group_picture']} for row in rows]
+    groups = [{'group_id': row[0], 'group_name': row[1], 'group_picture': row[2]} for row in rows]
     return jsonify({'groups': groups})
 
 # ✅ เพิ่มลูกค้าใหม่
@@ -1202,7 +1123,7 @@ def add_customer():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO Customers (customer, formtype, createdate) VALUES (%s, %s, %s)",
+        cursor.execute("INSERT INTO FG_Transport_Customers (customer, formtype, createdate) VALUES (?, ?, ?)",
                        (customer, formtype, createdate))
         conn.commit()
         cursor.close()
@@ -1219,24 +1140,33 @@ def get_customers():
     formtype = request.args.get('formtype')
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor) # ใช้ RealDictCursor
-        if formtype:
-            cursor.execute("SELECT customer, formtype, createdate FROM Customers WHERE LOWER(formtype) = %s", (formtype.lower(),))
-        else:
-            cursor.execute("SELECT customer, formtype, createdate FROM Customers")
+        cursor = conn.cursor()
 
+        if formtype:
+            cursor.execute(
+                "SELECT customer, formtype, createdate FROM FG_Transport_Customers WHERE LOWER(formtype) = ?",
+                (formtype.lower(),)
+            )
+        else:
+            cursor.execute("SELECT customer, formtype, createdate FROM FG_Transport_Customers")
+
+        # แปลง tuple → dict
+        columns = [col[0].lower() for col in cursor.description]
         rows = cursor.fetchall()
-        # rows เป็น list of dicts อยู่แล้ว
+        rows = [dict(zip(columns, row)) for row in rows]
+
+        # จัดการ datetime
         customers = []
         for row in rows:
             customers.append({
                 'customer': row['customer'],
                 'formtype': row['formtype'],
-                # จัดการ datetime object ของ psycopg2
                 'createdate': row['createdate'].strftime('%Y-%m-%d %H:%M:%S') if row['createdate'] else None
             })
+
         cursor.close()
         return jsonify({'success': True, 'data': customers})
+
     except Exception as e:
         print(f"Error getting customers: {e}")
         return jsonify({'success': False, 'error': str(e)})
@@ -1249,7 +1179,7 @@ def delete_customer(customer):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM Customers WHERE customer = %s", (customer,))
+        cursor.execute("DELETE FROM FG_Transport_Customers WHERE customer = ?", (customer,))
         conn.commit()
         cursor.close()
         return jsonify({'success': True, 'message': 'Customer deleted successfully'})
@@ -1274,7 +1204,7 @@ def add_transport():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO MasterTransport (Transport, formtype, createdate) VALUES (%s, %s, %s)",
+        cursor.execute("INSERT INTO FG_Transport_MasterTransport (Transport, formtype, createdate) VALUES (?, ?, ?)",
                        (Transport, formtype, createdate))
         conn.commit()
         cursor.close()
@@ -1291,23 +1221,32 @@ def get_transport():
     formtype = request.args.get('formtype')
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor) # ใช้ RealDictCursor
+        cursor = conn.cursor()
 
         if formtype:
-            cursor.execute("SELECT Transport, formtype, createdate FROM MasterTransport WHERE LOWER(formtype) = %s", (formtype.lower(),))
+            cursor.execute(
+                "SELECT Transport, formtype, createdate FROM FG_Transport_MasterTransport WHERE LOWER(formtype) = ?",
+                (formtype.lower(),)
+            )
         else:
-            cursor.execute("SELECT Transport, formtype, createdate FROM MasterTransport")
+            cursor.execute("SELECT Transport, formtype, createdate FROM FG_Transport_MasterTransport")
 
+        columns = [col[0].lower() for col in cursor.description]  # lowercase key
         rows = cursor.fetchall()
-        transport_list = [] # เปลี่ยนชื่อตัวแปรเพื่อไม่ให้ซ้ำกับ parameter
+        rows = [dict(zip(columns, row)) for row in rows]  # แปลง tuple → dict
+
+        # format createdate เป็น string
+        transport_list = []
         for row in rows:
             transport_list.append({
-                'Transport': row['transport'],
+                'transport': row['transport'],
                 'formtype': row['formtype'],
                 'createdate': row['createdate'].strftime('%Y-%m-%d %H:%M:%S') if row['createdate'] else None
             })
+
         cursor.close()
         return jsonify({'success': True, 'data': transport_list})
+
     except Exception as e:
         print(f"Error getting transports: {e}")
         return jsonify({'success': False, 'error': str(e)})
@@ -1320,7 +1259,7 @@ def delete_transport(transport):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM MasterTransport WHERE Transport = %s", (transport,))
+        cursor.execute("DELETE FROM FG_Transport_MasterTransport WHERE Transport = ?", (transport,))
         conn.commit()
         cursor.close()
         return jsonify({'success': True, 'message': 'Transport deleted successfully'})
@@ -1339,20 +1278,21 @@ def export_excel():
 
     conn = get_db_connection()
     # ใช้ RealDictCursor เพื่อให้ได้ dict และจัดการชื่อคอลัมน์ได้ง่าย
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor = conn.cursor()
 
     form_type_lower = form_type.lower() # แปลงเป็น lowercase
 
-    query = "SELECT * FROM Transports WHERE LOWER(FormType) = %s"
+    query = "SELECT * FROM FG_Transport_Transports WHERE LOWER(FormType) = ?"
     params = [form_type_lower]
 
     if start and end:
-        query += " AND RecordDate BETWEEN %s AND %s"
+        query += " AND RecordDate BETWEEN ? AND ?"
         params.extend([start, end])
     elif start and not end:
-        query += " AND RecordDate = %s"
+        query += " AND RecordDate = ?"
         params.append(start)
-
+        
+    query += " ORDER BY RecordDate DESC"
     cursor.execute(query, params)
     rows = cursor.fetchall() # RealDictCursor คืนค่าเป็น list of dicts
     cursor.close()
@@ -1377,6 +1317,11 @@ def export_excel():
         "containernumber", "producttype", "remark", "formtype", "recorddate"
     ]
 
+    # แปลงวันที่เป็น dd/mm/yyyy
+    for col in ["recorddate", "deliverydate"]:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%d/%m/%Y')
+            
     # กำหนดคอลัมน์ที่จะเลือกและเปลี่ยนชื่อกลับเป็นรูปแบบที่ต้องการใน Excel
     if form_type_lower == "domestic":
         df = df[columns_domestic]
@@ -1405,22 +1350,19 @@ def export_excel():
     # จัดการ RecordDate ให้เป็นรูปแบบวันที่ที่ต้องการ ถ้าเป็น datetime object
     # for col in ["RecordDate", "DeliveryDate"]:
     #     if col in df.columns:
-    #         df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) and isinstance(x, (datetime, pd.Timestamp)) else x)
-    for col in ["RecordDate", "DeliveryDate"]:
-        if col in df.columns:
-            def parse_and_format_date(x):
-                if pd.isna(x):
-                    return ""
-                if isinstance(x, (datetime, pd.Timestamp)):
-                    return x.strftime('%d/%m/%Y')
-                if isinstance(x, str):
-                    try:
-                        dt = parsedate_to_datetime(x)
-                        return dt.strftime('%d/%m/%Y')
-                    except Exception:
-                        return x
-                return x
-            df[col] = df[col].apply(parse_and_format_date)
+    #         def parse_and_format_date(x):
+    #             if pd.isna(x):
+    #                 return ""
+    #             if isinstance(x, (datetime, pd.Timestamp)):
+    #                 return x.strftime('%d/%m/%Y')
+    #             if isinstance(x, str):
+    #                 try:
+    #                     dt = parsedate_to_datetime(x)
+    #                     return dt.strftime('%d/%m/%Y')
+    #                 except Exception:
+    #                     return x
+    #             return x
+    #         df[col] = df[col].apply(parse_and_format_date)
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -1478,40 +1420,6 @@ def draw_header(canvas, doc, form_type):
     canvas.drawRightString(doc.width + doc.leftMargin, doc.height + 90, f"Report Date: {now}")
 
     canvas.restoreState()
-
-# def truncate_text(text, font_name, font_size, max_width):
-#     """ตัดข้อความให้พอดีกับความกว้าง max_width และเติม ... หากเกิน"""
-#     if not isinstance(text, str):
-#         text = str(text)
-    
-#     if stringWidth(text, font_name, font_size) <= max_width:
-#         return text
-
-#     while stringWidth(text + "...", font_name, font_size) > max_width and len(text) > 0:
-#         text = text[:-1]
-
-#     return text + "..."
-
-# from reportlab.pdfbase.pdfmetrics import stringWidth
-
-# def truncate_text(text, font_name, font_size, max_width):
-#     """ตัดข้อความให้พอดีกับความกว้าง max_width และเติม ... หากเกิน"""
-#     if not isinstance(text, str):
-#         text = str(text)
-
-#     ellipsis = "..."
-#     ellipsis_width = stringWidth(ellipsis, font_name, font_size)
-
-#     # ปรับลด max_width ลงเล็กน้อยเพื่อให้เผื่อความกว้างของ ...
-#     target_width = max_width - ellipsis_width - 2  # ลบเพิ่มอีกนิดเพื่อให้ตัดเร็วขึ้น
-
-#     while stringWidth(text, font_name, font_size) > target_width and len(text) > 0:
-#         text = text[:-1]
-
-#     if len(text) < len(str(text)):
-#         return text + ellipsis
-#     else:
-#         return text
     
 @app.route('/export_pdf', methods=['POST'])
 def export_pdf():
@@ -1541,16 +1449,16 @@ def export_pdf():
         "name": 14 * mm,
         "sender": 13 * mm,
         "customer": 22 * mm,
-        "queuetime": 7 * mm,
-        "startdeliver": 7 * mm,
-        "donedeliver": 7 * mm,
-        "confirmregis": 7 * mm,
-        "truckloadin": 7 * mm,
-        "startload": 7 * mm,
-        "doneload": 7 * mm,
+        "queuetime": 8 * mm,
+        "startdeliver": 8 * mm,
+        "donedeliver": 8 * mm,
+        "confirmregis": 8 * mm,
+        "truckloadin": 8 * mm,
+        "startload": 8 * mm,
+        "doneload": 8 * mm,
         "deliverytime": 15.8 * mm,
         "status": 16 * mm,
-        "deliverytimetocustomer": 15 * mm,
+        "deliverytimetocustomer": 10 * mm,
         "deliverydate": 15.5 * mm,
         "remark": 20 * mm,
         "pi": 14 * mm,
@@ -1559,9 +1467,6 @@ def export_pdf():
         "producttype": 30 * mm,
     }
 
-
-    # กำหนดชื่อหัวตารางเป็นภาษาไทย (ต้อง match จำนวนคอลัมน์ที่เลือก)
-    # ใช้ key เป็น lowercase ตามที่ RealDictCursor คืนค่ามา
     header_thai = {
         "recorddate": "Date",
         "plate": "ทะเบียน",
@@ -1581,22 +1486,13 @@ def export_pdf():
         "deliverydate": "วันที่ส่งสินค้า",
         "remark": "หมายเหตุ",
         "pi": "PI", # เพิ่ม PI, EO ถ้ายังไม่มี
-        "eo": "EO",
+        "eo": "DP",
         "containernumber": "เบอร์ตู้",
         "producttype": "ชนิดสินค้า",
     }
 
-    # สร้างแถวหัวตารางภาษาไทย ตาม columns ที่ส่งมา
-    # ปรับ columns ที่ส่งมาให้เป็น lowercase ก่อนหาใน header_thai
     headers = [header_thai.get(col.lower(), col) for col in columns]
 
-    # สร้างข้อมูลตาราง: แถวหัว + แถวข้อมูล
-    # ตรวจสอบการเข้าถึงข้อมูลใน row ให้เป็น row[col.lower()]
-    # data_rows = [
-    #     [str(row.get(col.lower(), "")) for col in columns]
-    #     for row in table_data
-    # ]
-    # ตั้งค่ารูปแบบข้อความของ paragraph
     style = ParagraphStyle(
         name='Normal',
         fontName=bold_font,
@@ -1605,24 +1501,22 @@ def export_pdf():
         alignment=TA_LEFT,
     )
 
-    # data_rows = []
-    # for row in table_data:
-    #     row_cells = []
-    #     for col in columns:
-    #         value = str(row.get(col.lower(), "")).strip()
-    #         paragraph = Paragraph(value.replace("\n", "<br/>"), style)
-    #         row_cells.append(paragraph)
-    #     data_rows.append(row_cells)
-
-    #     header_style = ParagraphStyle(
-    #     name='HeaderStyle',
-    #     fontName=bold_font,
-    #     fontSize=9,
-    #     leading=11,
-    #     alignment=TA_CENTER,
-    #     textColor=colors.whitesmoke
-    # )
     data_rows = []
+    # แปลง recorddate เป็น datetime เพื่อให้ sort ถูกต้อง
+    for row in table_data:
+        value = row.get("recorddate", "")
+        if value:
+            try:
+                dt = parsedate_to_datetime(value)
+                row["_recorddate_dt"] = dt
+            except Exception:
+                row["_recorddate_dt"] = datetime.min
+        else:
+            row["_recorddate_dt"] = datetime.min
+
+    # sort จากล่าสุดไปเก่าสุด
+    table_data.sort(key=lambda x: x["_recorddate_dt"], reverse=True)
+
     for row in table_data:
         row_cells = []
         for col in columns:
@@ -1644,9 +1538,7 @@ def export_pdf():
             paragraph = Paragraph(value_str.replace("\n", "<br/>"), style)
             row_cells.append(paragraph)
         data_rows.append(row_cells)
-    print("=== form_type:", form_type)
-    print("=== columns:", columns)
-
+        
     # ย้ายส่วนนี้ออกมานอกลูป เพื่อสร้างแค่ครั้งเดียว
     header_style = ParagraphStyle(
         name='HeaderStyle',
@@ -1666,8 +1558,6 @@ def export_pdf():
     pdf_table_data = [headers] + data_rows
 
     # ปรับ col_widths ให้ตรงกับ columns ที่ส่งมาและใช้ lowercase
-    # col_widths = [col_width_map.get(col.capitalize(), 25 * mm) for col in columns] # .capitalize() เพราะ key ใน map เป็นแบบนั้น
-    # col_widths = [col_width_map.get(col.lower(), 25 * mm) for col in columns]
     total_width = 270 * mm  # ประมาณความกว้าง usable ของ A4 แนวนอน
     total_weight = sum([col_width_map.get(col.lower(), 25) for col in columns])
     col_widths = [
@@ -1705,23 +1595,26 @@ def export_pdf():
 
     return send_file(buffer,mimetype='application/pdf',download_name=f"{form_type}_Report_{timestamp}.pdf",as_attachment=True)
 
+
+# # Set webhook เฉพาะตอนอยู่บน Render
+# if os.environ.get("RENDER") == "true":
+#     webhook_url = "https://wice-transports-1.onrender.com"
+#     set_line_webhook(webhook_url)
+
+# # 🧪 ถ้าเป็น local ให้รัน app และ set webhook แบบ localhost
 # if __name__ == '__main__':
-#     public_url = start_ngrok(PORT)
-#     if public_url:
-#         set_line_webhook(public_url)
-#     app.run(debug=True, port=PORT)
-# 🌐 ตั้ง Webhook ถ้าเป็น Render
+#     webhook_url = "http://localhost:5000/callback"
+#     set_line_webhook(webhook_url)
 
-
-# Set webhook เฉพาะตอนอยู่บน Render
+#     # ต้องแยก host กับ port อย่าเขียนรวมกัน
+#     app.run(host='0.0.0.0', port=PORT)
 if os.environ.get("RENDER") == "true":
+    # อยู่บน Render
     webhook_url = "https://wice-transports-1.onrender.com"
     set_line_webhook(webhook_url)
 
-# 🧪 ถ้าเป็น local ให้รัน app และ set webhook แบบ localhost
 if __name__ == '__main__':
+    # อยู่ local
     webhook_url = "http://localhost:5000/callback"
     set_line_webhook(webhook_url)
-
-    # ต้องแยก host กับ port อย่าเขียนรวมกัน
     app.run(host='0.0.0.0', port=PORT)

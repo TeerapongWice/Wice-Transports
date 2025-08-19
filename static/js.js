@@ -251,22 +251,22 @@ function deleteRow(btn) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: id })
     })
-    .then(response => {
-      if (response.ok) {
-        document.getElementById("DeteleData").classList.add("show");
-        row.remove();
-      } else {
+      .then(response => {
+        if (response.ok) {
+          document.getElementById("DeteleData").classList.add("show");
+          row.remove();
+        } else {
+          document.getElementById("DeleteError").classList.add("show");
+        }
+      })
+      .catch(error => {
+        console.error('Delete error:', error);
         document.getElementById("DeleteError").classList.add("show");
-      }
-    })
-    .catch(error => {
-      console.error('Delete error:', error);
-      document.getElementById("DeleteError").classList.add("show");
-    })
-    .finally(() => {
-      modal.classList.remove('show');
-      cleanup();
-    });
+      })
+      .finally(() => {
+        modal.classList.remove('show');
+        cleanup();
+      });
   }
 
   // กดปุ่ม "ยกเลิก"
@@ -644,6 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
   currentDataDomestic = Array.from(domesticRows).map(row => {
     const cells = row.querySelectorAll('input');
     return {
+      recorddate: row.dataset.recorddate || '',
       plate: cells[1]?.value || '',
       name: cells[2]?.value || '',
       sender: cells[3]?.value || '',
@@ -669,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
   currentDataExport = Array.from(exportRows).map(row => {
     const cells = row.querySelectorAll('input');
     return {
+      recorddate: row.dataset.recorddate || '',
       pi: cells[1]?.value || '',
       eo: cells[2]?.value || '',
       containernumber: cells[3]?.value || '',
@@ -926,14 +928,14 @@ function loadTransportOptions() {
           data.data.forEach(item => {
             const span = document.createElement('span');
             span.className = 'option-text';
-            span.textContent = item.Transport;
+            span.textContent = item.transport;
             span.onclick = () => selectSender(span, container);
 
             const btnDelete = document.createElement('button');
             btnDelete.className = 'delete-btn';
             btnDelete.type = 'button';
             btnDelete.textContent = 'x';
-            btnDelete.onclick = () => deleteTransport(item.Transport, container);
+            btnDelete.onclick = () => deleteTransport(item.transport, container);
 
             const div = document.createElement('div');
             div.className = 'option-item';
@@ -951,7 +953,6 @@ function loadTransportOptions() {
       });
   });
 }
-
 // ลบผู้ขนส่ง
 // function deleteTransport(transportName, container) {
 //   if (!confirm(`คุณต้องการลบ "${transportName}" ใช่หรือไม่?`)) return;
@@ -988,25 +989,25 @@ function confirmDeleteTransport() {
   fetch(`/api/masterTransports/${encodeURIComponent(transportToDelete)}`, {
     method: 'DELETE'
   })
-  .then(response => response.json())
-  .then(result => {
-    if (result.success) {
-      closeAlert(); // ซ่อน modal confirm
+    .then(response => response.json())
+    .then(result => {
+      if (result.success) {
+        closeAlert(); // ซ่อน modal confirm
 
-      // แสดง modal success พร้อมชื่อที่ลบ
-      document.getElementById("DeleteTransportSuccess").innerText = ` ${transportToDelete} `;
-      document.getElementById("SendDeleteSuccess").classList.add("show");
+        // แสดง modal success พร้อมชื่อที่ลบ
+        document.getElementById("DeleteTransportSuccess").innerText = ` ${transportToDelete} `;
+        document.getElementById("SendDeleteSuccess").classList.add("show");
 
-      // โหลดข้อมูลผู้ขนส่งใหม่
-      loadTransportOptions();
-    } else {
-      alert('เกิดข้อผิดพลาด: ' + result.error);
-    }
-  })
-  .catch(error => {
-    console.error('Delete transport error:', error);
-    closeAlert();
-  });
+        // โหลดข้อมูลผู้ขนส่งใหม่
+        loadTransportOptions();
+      } else {
+        alert('เกิดข้อผิดพลาด: ' + result.error);
+      }
+    })
+    .catch(error => {
+      console.error('Delete transport error:', error);
+      closeAlert();
+    });
 }
 
 
@@ -1196,24 +1197,24 @@ function confirmDeleteCustomer() {
   fetch(`/api/customers/${encodeURIComponent(customerToDelete)}`, {
     method: 'DELETE'
   })
-  .then(response => response.json())
-  .then(result => {
-    if (result.success) {
-      closeAlert(); // ซ่อน modal confirm
+    .then(response => response.json())
+    .then(result => {
+      if (result.success) {
+        closeAlert(); // ซ่อน modal confirm
 
-      // แสดง modal success พร้อมชื่อที่ลบ
-      document.getElementById("DeleteCustomerSuccess").innerText = ` ${customerToDelete} `;
-      document.getElementById("CustomerDeleteSuccess").classList.add("show");
+        // แสดง modal success พร้อมชื่อที่ลบ
+        document.getElementById("DeleteCustomerSuccess").innerText = ` ${customerToDelete} `;
+        document.getElementById("CustomerDeleteSuccess").classList.add("show");
 
-      loadCustomerOptions(); // โหลดข้อมูลลูกค้าใหม่
-    } else {
-      alert('เกิดข้อผิดพลาด: ' + result.error);
-    }
-  })
-  .catch(error => {
-    console.error('Delete customer error:', error);
-    closeAlert();
-  });
+        loadCustomerOptions(); // โหลดข้อมูลลูกค้าใหม่
+      } else {
+        alert('เกิดข้อผิดพลาด: ' + result.error);
+      }
+    })
+    .catch(error => {
+      console.error('Delete customer error:', error);
+      closeAlert();
+    });
 }
 
 // เปิด-ปิด dropdown ลูกค้า
@@ -1244,8 +1245,6 @@ function showAddCustomerInput(container) {
 function selectCustomer(el, container) {
   const text = el.textContent.trim();
   container.querySelector('.custom-select-header').innerHTML = `${text} <span class="arrow">▼</span>`;
-  // container.querySelector('input[type="hidden"]').value = text;
-  // container.querySelector('input[name="customer"]').value = text;
   const form = container.closest('form');
   if (form) {
     const input = form.querySelector('input[name="customer"]');
@@ -1270,50 +1269,6 @@ document.addEventListener('DOMContentLoaded', function () {
   loadCustomerOptions();
 });
 
-// function exportDataArrayToExcel(dataArray, filename, formType) {
-//   if (!dataArray || dataArray.length === 0) {
-//     // alert("ไม่มีข้อมูลให้ Export");
-//     document.getElementById("ExcelError").classList.add("show");
-//     return;
-//   }
-
-//   // เลือกคอลัมน์ที่ต้องการ export ตาม formType
-//   const columnsDomestic = [
-//     "plate", "name", "sender", "customer", "queuetime", "startdeliver", "donedeliver",
-//     "confirmregis", "truckloadin", "startload", "doneload", "deliverytime", "status",
-//     "deliverytimetocustomer", "deliverydate", "recorddate", "remark"
-//   ];
-
-//   const columnsExport = [
-//     "pi", "eo", "containernumber", "plate", "name", "sender", "customer",
-//     "producttype", "queuetime", "startdeliver", "donedeliver", "truckloadin",
-//     "startload", "doneload", "recorddate", "remark"
-//   ];
-
-//   const selectedColumns = formType === "Domestic" ? columnsDomestic : columnsExport;
-
-//   // แปลง dataArray เป็น Array ของ Array (2D) สำหรับ Excel
-//   const header = selectedColumns;
-//   const body = dataArray.map(row =>
-//     selectedColumns.map(col => row[col] ?? "")
-//   );
-
-//   const worksheetData = [header, ...body];
-
-//   const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-//   const wb = XLSX.utils.book_new();
-//   XLSX.utils.book_append_sheet(wb, ws, "Export");
-
-//   XLSX.writeFile(wb, filename);
-// }
-
-// document.getElementById("ExcelDomestic").addEventListener("click", function () {
-//   exportDataArrayToExcel(currentDataDomestic, "Domestic_Exported.xlsx", "Domestic");
-// });
-
-// document.getElementById("ExcelExport").addEventListener("click", function () {
-//   exportDataArrayToExcel(currentDataExport, "Export_Exported.xlsx", "Export");
-// });
 function formatDateToDDMMYYYY(dateStr) {
   if (!dateStr) return "";
   const date = new Date(dateStr);
@@ -1331,27 +1286,27 @@ function exportDataArrayToExcel(dataArray, filenamePrefix, formType) {
   }
 
   const columnsDomestic = [
-    "plate", "name", "sender", "customer", "queuetime", "startdeliver", "donedeliver",
+    "recorddate", "plate", "name", "sender", "customer", "queuetime", "startdeliver", "donedeliver",
     "confirmregis", "truckloadin", "startload", "doneload", "deliverytime", "status",
-    "deliverytimetocustomer", "deliverydate", "recorddate", "remark"
+    "deliverytimetocustomer", "deliverydate", "remark"
   ];
 
   const columnsExport = [
-    "pi", "eo", "containernumber", "plate", "name", "sender", "customer",
+    "recorddate", "pi", "eo", "containernumber", "plate", "name", "sender", "customer",
     "producttype", "queuetime", "startdeliver", "donedeliver", "truckloadin",
-    "startload", "doneload", "recorddate", "remark"
+    "startload", "doneload", "remark"
   ];
 
   const headerDomesticTH = [
-    "ทะเบียน", "ชื่อพนักงานขับ", "ผู้ขนส่ง", "ลูกค้า", "เวลาที่รถลงคิว", "เริ่มตั้งสินค้า", "ตั้งสินค้าสำเร็จ",
+    "วันที่บันทึก", "ทะเบียน", "ชื่อพนักงานขับ", "ผู้ขนส่ง", "ลูกค้า", "เวลาที่รถลงคิว", "เริ่มตั้งสินค้า", "ตั้งสินค้าสำเร็จ",
     "ขนส่งตอบรับทะเบียน", "รถเข้าโหลดสินค้า", "เริ่มโหลดสินค้า", "โหลดสินค้าสำเร็จ", "เวลาส่งสินค้า", "สถานะ",
-    "เวลาส่งถึงลูกค้า", "วันที่ส่งสินค้า", "วันที่บันทึก", "หมายเหตุ"
+    "เวลาส่งถึงลูกค้า", "วันที่ส่งสินค้า", "หมายเหตุ"
   ];
 
   const headerExportTH = [
-    "PI", "EO", "เบอร์ตู้", "ทะเบียน", "ชื่อพนักงานขับ", "ผู้ขนส่ง", "ลูกค้า",
+    "วันที่บันทึก", "PI", "DP", "เบอร์ตู้", "ทะเบียน", "ชื่อพนักงานขับ", "ผู้ขนส่ง", "ลูกค้า",
     "ชนิดสินค้า", "เวลาที่รถลงคิว", "เริ่มตั้งสินค้า", "ตั้งสินค้าสำเร็จ", "รถเข้าโหลดสินค้า",
-    "เริ่มโหลดสินค้า", "โหลดสินค้าสำเร็จ", "วันที่บันทึก", "หมายเหตุ"
+    "เริ่มโหลดสินค้า", "โหลดสินค้าสำเร็จ", "หมายเหตุ"
   ];
 
   const selectedColumns = formType === "Domestic" ? columnsDomestic : columnsExport;
@@ -1367,13 +1322,6 @@ function exportDataArrayToExcel(dataArray, filenamePrefix, formType) {
   );
 
   const worksheetData = [header, ...body];
-
-  // const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-  // const wb = XLSX.utils.book_new();
-  // XLSX.utils.book_append_sheet(wb, ws, "Export");
-
-  // XLSX.writeFile(wb, filename);
-  // สร้าง timestamp แบบ yyyyMMdd_HHmm
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -1391,14 +1339,6 @@ function exportDataArrayToExcel(dataArray, filenamePrefix, formType) {
   XLSX.writeFile(wb, filename);
 }
 
-// document.getElementById("ExcelDomestic").addEventListener("click", function () {
-//   exportDataArrayToExcel(currentDataDomestic, "Domestic_Exported.xlsx", "Domestic");
-// });
-
-// document.getElementById("ExcelExport").addEventListener("click", function () {
-//   exportDataArrayToExcel(currentDataExport, "Export_Exported.xlsx", "Export");
-// });
-// เรียกใช้งานใหม่ให้ส่ง prefix แทน filename เต็ม
 document.getElementById("ExcelDomestic").addEventListener("click", function () {
   exportDataArrayToExcel(currentDataDomestic, "Domestic_Exported", "Domestic");
 });
@@ -1462,6 +1402,8 @@ function exportDataArrayToPDF(dataArray, formType) {
 // Example: event listeners
 document.getElementById("PDFDomestic").addEventListener("click", function () {
   exportDataArrayToPDF(currentDataDomestic, "Domestic");
+  console.log(currentDataDomestic);
+
 });
 
 document.getElementById("PDFExport").addEventListener("click", function () {

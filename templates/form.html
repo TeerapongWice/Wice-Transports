@@ -136,7 +136,7 @@
         <div class="form-grid">
           <input type="hidden" id="date" name="date" value="{{ current_date }}">
           <div class="form-item"><label for="Pi">PI</label><input type="text" id="Pi" name="Pi" /></div>
-          <div class="form-item"><label for="Eo">EO</label><input type="text" id="Eo" name="Eo" /></div>
+          <div class="form-item"><label for="Eo">DP</label><input type="text" id="Eo" name="Eo" /></div>
           <div class="form-item"><label for="Container_number">เบอร์ตู้</label><input type="text" id="Container_number"
               name="Container_number" /></div>
           <div class="form-item"><label for="plate_export">ทะเบียน</label><input type="text" id="plate_export"
@@ -254,7 +254,7 @@
       </thead>
       <tbody id="domesticTable">
         {% for row in domestic_data %}
-        <tr data-id="{{ row.id }}" data-formtype="Domestic">
+        <tr data-id="{{ row.id }}" data-formtype="Domestic" data-recorddate="{{ row.recorddate }}">
           <td><input type="checkbox" class="row-checkbox"></td>
           <td><input type="text" value="{{ row.plate }}" disabled></td>
           <td><input type="text" value="{{ row.name }}" disabled></td>
@@ -308,7 +308,7 @@
         <tr>
           <th><input type="checkbox" onclick="toggleAllCheckboxes(this)"></th>
           <th>PI</th>
-          <th>EO</th>
+          <th>DP</th>
           <th>เบอร์ตู้</th>
           <th>ทะเบียน</th>
           <th>ชื่อ</th>
@@ -327,7 +327,7 @@
       </thead>
       <tbody id="exportTable">
         {% for row in export_data %}
-        <tr data-id="{{ row.id }}" data-formtype="Export">
+        <tr data-id="{{ row.id }}" data-formtype="Export" data-recorddate="{{ row.recorddate }}">
           <td><input type="checkbox" class="row-checkbox"></td>
           <td><input type="text" value="{{ row.pi }}" disabled></td>
           <td><input type="text" value="{{ row.eo }}" disabled></td>

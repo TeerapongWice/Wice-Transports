@@ -34,6 +34,8 @@ create_table.py
 create_transports_table.py
 create_user.py
 wice.py
+app_backup.py
+app_sqlserver.py
 
 # Ignore batch file
 start.bat
